@@ -111,6 +111,7 @@ noinst_HEADERS = \
 	src/sh/ffitarget.h						\
 	src/sh64/ffitarget.h						\
 	src/sparc/ffitarget.h src/sparc/internal.h			\
+	src/riscv/ffitarget.h						\
 	src/tile/ffitarget.h						\
 	src/vax/ffitarget.h						\
 	src/x86/ffitarget.h src/x86/internal.h src/x86/internal64.h	\
@@ -146,6 +147,7 @@ EXTRA_libffi_la_SOURCES = \
 	src/sh/ffi.c src/sh/sysv.S					\
 	src/sh64/ffi.c src/sh64/sysv.S					\
 	src/sparc/ffi.c src/sparc/ffi64.c src/sparc/v8.S src/sparc/v9.S	\
+	src/riscv/ffi.c src/riscv/sysv.S				\
 	src/tile/ffi.c src/tile/tile.S					\
 	src/vax/ffi.c src/vax/elfbsd.S					\
 	src/x86/ffi.c src/x86/sysv.S					\
