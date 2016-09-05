@@ -32,6 +32,7 @@ EXTRA_DIST = LICENSE ChangeLog.v1 ChangeLog.libgcj			\
 	 src/powerpc/asm.h src/powerpc/aix.S src/powerpc/darwin.S	\
 	 src/powerpc/aix_closure.S src/powerpc/darwin_closure.S		\
 	 src/powerpc/ffi_darwin.c src/powerpc/ffitarget.h		\
+	 src/riscv/ffi.c src/riscv/sysv.S src/riscv/ffitarget.h		\
 	 src/s390/ffi.c src/s390/sysv.S src/s390/ffitarget.h		\
 	 src/sh/ffi.c src/sh/sysv.S src/sh/ffitarget.h src/sh64/ffi.c	\
 	 src/sh64/sysv.S src/sh64/ffitarget.h src/sparc/v8.S		\
@@ -235,6 +236,9 @@ nodist_libffi_la_SOURCES += src/metag/sysv.S src/metag/ffi.c
 endif
 if VAX
 nodist_libffi_la_SOURCES += src/vax/elfbsd.S src/vax/ffi.c
+endif
+if RISCV
+nodist_libffi_la_SOURCES += src/riscv/sysv.S src/riscv/ffi.c
 endif
 
 libffi_convenience_la_SOURCES = $(libffi_la_SOURCES)

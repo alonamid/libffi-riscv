@@ -261,6 +261,10 @@ case "$host" in
 	TARGET=POWERPC; TARGETDIR=powerpc
 	;;
 
+  riscv32-*-* | riscv64-*-*)
+	TARGET=RISCV; TARGETDIR=riscv
+	;;
+
   s390-*-* | s390x-*-*)
 	TARGET=S390; TARGETDIR=s390
 	;;
