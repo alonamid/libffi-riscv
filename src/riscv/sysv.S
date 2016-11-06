@@ -29,7 +29,8 @@
 #define LIBFFI_ASM  
 #include <fficonfig.h>
 #include <ffi.h>
-    
+#include "internal.h"
+
 #define callback a0
 #define ecif     a1
 #define bytes    a2

@@ -28,6 +28,7 @@
 
 #include <ffi.h>
 #include <ffi_common.h>
+#include "internal.h"
 
 #include <stdlib.h>
 #include <stdint.h>
