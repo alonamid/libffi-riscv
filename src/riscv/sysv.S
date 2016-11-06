@@ -2,8 +2,8 @@
    ffi.c - Copyright (c) 2015 Michael Knyszek <mknyszek@berkeley.edu>
                          2015 Andrew Waterman <waterman@cs.berkeley.edu>
    Based on MIPS N32/64 port
-   
-   RISC-V Foreign Function Interface 
+
+   RISC-V Foreign Function Interface
 
    Permission is hereby granted, free of charge, to any person obtaining
    a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@
    DEALINGS IN THE SOFTWARE.
    ----------------------------------------------------------------------- */
 
-#define LIBFFI_ASM  
+#define LIBFFI_ASM
 #include <fficonfig.h>
 #include <ffi.h>
 #include "internal.h"
@@ -69,59 +69,59 @@
     .type   ffi_call_asm, @function
 ffi_call_asm:
     .cfi_startproc
-    
+
     ### Prologue
-    
+
     # a0 - ffi_prep_args pointer
     # a1 - extended_cif pointer
     # a2 - bytes
     # a3 - flags
     # a4 - rvalue
     # a5 - function ptr
-    
+
     add     sp, sp, -SIZEOF_FRAME   # move stack pointer by frame size
-                                    # must be 16-byte aligned 
-    
+                                    # must be 16-byte aligned
+
     # stack ptr points to first argument on stack,
     # but there should be no arguments on the stack
-    
+
     .cfi_def_cfa_offset SIZEOF_FRAME
-    
+
     REG_S   ra,      FFI_SIZEOF_ARG_X5(sp)   # save return address
     REG_S   fp,      FFI_SIZEOF_ARG_X4(sp)   # save frame pointer
     REG_S   flags,   FFI_SIZEOF_ARG_X3(sp)   # save flags
     REG_S   fn,      FFI_SIZEOF_ARG_X2(sp)   # save function pointer
     REG_S   rvalue,  FFI_SIZEOF_ARG_X1(sp)   # save return value pointer
-    
+
     .cfi_offset 1, -8
     .cfi_offset 8, -16
-    
+
     add     fp, sp, SIZEOF_FRAME     # new frame pointer is old stack pointer
-    
+
     .cfi_def_cfa 8, 0
-    
+
     add     t4, callback, zero       # function ptr to prep_args
-    
+
     # Here we're setting up our argspace and its size
-    
-    add     t0, bytes, 15      # make sure it is aligned 
+
+    add     t0, bytes, 15      # make sure it is aligned
     andi    t0, t0,   -16      # to a 16 byte boundry
 
 thirtytwo:
     sub     sp, sp, t0 # move the stack pointer to reflect the arg space
-    
+
     # a0 is the stack with proper arg space allocated
     add     a0, sp, zero
-    
+
     # a1 is ecif
     # a2 is bytes
     # a3 is flags
 
     jalr    t4  # call ffi_prep_args
-    
+
     REG_L   t0, -FFI_SIZEOF_ARG_X3(fp)  # load the flags word
     srli    t2, t0, 16                 # shift our return type into t2
-    
+
     li      t1, ARG_MASK
     and     t0, t0, t1                 # mask out the arg types into t0
 
@@ -136,20 +136,20 @@ thirtytwo:
 set_arg0:
     srli    t1, t0, FFI_FLAG_BITS_X0 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg0_float 
+    bne     t1, zero, set_arg0_float
     REG_L   a0, FFI_SIZEOF_ARG_X0(sp) # load argument
     j       set_arg1
-    
+
 set_arg0_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg0_double
     flw     fa0, FFI_SIZEOF_ARG_X0(sp) # load argument
     j       set_arg1
-    
+
 set_arg0_double:
     # otherwise it must be a double we're dealing with
     fld     fa0, FFI_SIZEOF_ARG_X0(sp)
@@ -161,20 +161,20 @@ set_arg0_double:
 set_arg1:
     srli    t1, t0, FFI_FLAG_BITS_X1 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg1_float 
+    bne     t1, zero, set_arg1_float
     REG_L   a1, FFI_SIZEOF_ARG_X1(sp) # load argument
     j       set_arg2
-    
+
 set_arg1_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg1_double
     flw     fa1, FFI_SIZEOF_ARG_X1(sp) # load argument
     j       set_arg2
-    
+
 set_arg1_double:
     # otherwise it must be a double we're dealing with
     fld     fa1, FFI_SIZEOF_ARG_X1(sp)
@@ -186,20 +186,20 @@ set_arg1_double:
 set_arg2:
     srli    t1, t0, FFI_FLAG_BITS_X2 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg2_float 
+    bne     t1, zero, set_arg2_float
     REG_L   a2, FFI_SIZEOF_ARG_X2(sp) # load argument
     j       set_arg3
-    
+
 set_arg2_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg2_double
     flw     fa2, FFI_SIZEOF_ARG_X2(sp) # load argument
     j       set_arg3
-    
+
 set_arg2_double:
     # otherwise it must be a double we're dealing with
     fld     fa2, FFI_SIZEOF_ARG_X2(sp)
@@ -211,20 +211,20 @@ set_arg2_double:
 set_arg3:
     srli    t1, t0, FFI_FLAG_BITS_X3 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg3_float 
+    bne     t1, zero, set_arg3_float
     REG_L   a3, FFI_SIZEOF_ARG_X3(sp) # load argument
     j       set_arg4
-    
+
 set_arg3_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg3_double
     flw     fa3, FFI_SIZEOF_ARG_X3(sp) # load argument
     j       set_arg4
-    
+
 set_arg3_double:
     # otherwise it must be a double we're dealing with
     fld     fa3, FFI_SIZEOF_ARG_X3(sp)
@@ -236,20 +236,20 @@ set_arg3_double:
 set_arg4:
     srli    t1, t0, FFI_FLAG_BITS_X4 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg4_float 
+    bne     t1, zero, set_arg4_float
     REG_L   a4, FFI_SIZEOF_ARG_X4(sp) # load argument
     j       set_arg5
-    
+
 set_arg4_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg4_double
     flw     fa4, FFI_SIZEOF_ARG_X4(sp) # load argument
     j       set_arg5
-    
+
 set_arg4_double:
     # otherwise it must be a double we're dealing with
     fld     fa4, FFI_SIZEOF_ARG_X4(sp)
@@ -261,20 +261,20 @@ set_arg4_double:
 set_arg5:
     srli    t1, t0, FFI_FLAG_BITS_X5 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg5_float 
+    bne     t1, zero, set_arg5_float
     REG_L   a5, FFI_SIZEOF_ARG_X5(sp) # load argument
     j       set_arg6
-    
+
 set_arg5_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg5_double
     flw     fa5, FFI_SIZEOF_ARG_X5(sp) # load argument
     j       set_arg6
-    
+
 set_arg5_double:
     # otherwise it must be a double we're dealing with
     fld     fa5, FFI_SIZEOF_ARG_X5(sp)
@@ -286,20 +286,20 @@ set_arg5_double:
 set_arg6:
     srli    t1, t0, FFI_FLAG_BITS_X6 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg6_float 
+    bne     t1, zero, set_arg6_float
     REG_L   a6, FFI_SIZEOF_ARG_X6(sp) # load argument
     j       set_arg7
-    
+
 set_arg6_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg6_double
     flw     fa6, FFI_SIZEOF_ARG_X6(sp) # load argument
     j       set_arg7
-    
+
 set_arg6_double:
     # otherwise it must be a double we're dealing with
     fld     fa6, FFI_SIZEOF_ARG_X6(sp)
@@ -311,30 +311,30 @@ set_arg6_double:
 set_arg7:
     srli    t1, t0, FFI_FLAG_BITS_X7 # Shift to get the bits for this argument
     andi    t1, t1, 3               # Mask out the bits for this argument
-    
+
     # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg7_float 
+    bne     t1, zero, set_arg7_float
     REG_L   a7, FFI_SIZEOF_ARG_X7(sp) # load argument
     j       call_it
-    
+
 set_arg7_float:
     addi    t1, t1, -2
-    
+
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg7_double
     flw     fa7, FFI_SIZEOF_ARG_X7(sp) # load argument
     j       call_it
-    
+
 set_arg7_double:
     # otherwise it must be a double we're dealing with
     fld     fa7, FFI_SIZEOF_ARG_X7(sp)
-    
+
 #else
 
 ## START RISCV SOFT-FLOAT LOADING ##
 
     # In the soft-float case, we have no primitive datatype
-    # that has a size of >8 bytes. Therefore, we can 
+    # that has a size of >8 bytes. Therefore, we can
     # just load everything quite easily and nicely.
 
     REG_L   a0, FFI_SIZEOF_ARG_X0(sp) # load argument
@@ -346,7 +346,7 @@ set_arg7_double:
     REG_L   a6, FFI_SIZEOF_ARG_X6(sp) # load argument
     REG_L   a7, FFI_SIZEOF_ARG_X7(sp) # load argument
 
-#endif  
+#endif
 
 call_it:
     # First, we fix the stack pointer to point to the first argument
@@ -359,13 +359,13 @@ call_it:
     # When the return value pointer is NULL, assume no return value.
     REG_L   t1, -FFI_SIZEOF_ARG_X5(fp)
     beq     t1, zero, return_void
-    
+
     # is the return type an int? if not, jump ahead
     ori     t3, zero, FFI_TYPE_INT
     bne     t2, t3,   return_int32
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0, -FFI_SIZEOF_ARG_X5(fp)
@@ -379,23 +379,23 @@ return_int32:
 #else
     bne     t2, t3, return_struct_d_soft
 #endif
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0, -FFI_SIZEOF_ARG_X5(fp)
     sw      a0, 0(t0)
     j       epilogue
-    
+
 #ifndef __riscv_soft_float
 return_float:
     # is the return type a float? if not, jump ahead
     ori     t3, zero, FFI_TYPE_FLOAT
     bne     t2, t3, return_double
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
@@ -406,9 +406,9 @@ return_double:
     # is the return type a double? if not, give up
     ori     t3, zero, FFI_TYPE_DOUBLE
     bne     t2, t3, return_struct_d
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
@@ -425,84 +425,84 @@ return_struct_d:
     # is the return type a struct with a double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_D
     bne     t2, t3,   return_struct_f
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsd     fa0, FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
 return_struct_f:
     # is the return type a struct with a float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_F
     bne     t2, t3,   return_struct_d_d
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsw     fa0, FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
 return_struct_d_d:
     # is the return type a struct with two doubles? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DD
     bne     t2, t3,   return_struct_f_f
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsd     fa0, FFI_SIZEOF_ARG_X0(t0)
     fsd     fa1, FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_f_f:
     # is the return type a struct with two floats? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FF
     bne     t2, t3,   return_struct_d_f
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsw     fa0, FFI_SIZEOF_ARG_X0(t0)
     fsw     fa1, FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_d_f:
     # is the return type a struct with a double then float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DF
     bne     t2, t3,   return_struct_f_d
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsd     fa0, FFI_SIZEOF_ARG_X0(t0)
     fsw     fa1, FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_f_d:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FD
     bne     t2, t3,   return_struct_small
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsw     fa0, FFI_SIZEOF_ARG_X0(t0)
     fsd     fa1, FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 #else
 
 ### Handle struct special cases (soft float)
@@ -515,85 +515,85 @@ return_struct_d_soft:
     # is the return type a struct with a double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_D_SOFT
     bne     t2, t3,   return_struct_f_soft
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
 return_struct_f_soft:
     # is the return type a struct with a float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_F_SOFT
     bne     t2, t3,   return_struct_d_d_soft
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
 return_struct_d_d_soft:
     # is the return type a struct with two doubles? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DD_SOFT
     bne     t2, t3,   return_struct_f_f_soft
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_f_f_soft:
     # is the return type a struct with two floats? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FF_SOFT
     bne     t2, t3,   return_struct_d_f_soft
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_d_f_soft:
     # is the return type a struct with a double then float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DF_SOFT
     bne     t2, t3,   return_struct_f_d_soft
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 return_struct_f_d_soft:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FD_SOFT
     bne     t2, t3,   return_struct_small
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
-#endif    
+
+#endif
 
 ### Handle struct special cases (tiny structs)
 
@@ -601,44 +601,44 @@ return_struct_small:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_SMALL
     bne     t2, t3,   return_struct_small2
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     REG_S   a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
 return_struct_small2:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_SMALL2
     bne     t2, t3,   return_struct
-    
+
     jalr    t4 # call the function
-    
+
     # We reload the return pointer because it was in a temp reg and
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     REG_S   a0,  FFI_SIZEOF_ARG_X0(t0)
     REG_S   a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 ### Any other struct is returned through memory
-return_struct: 
-return_void:   
+return_struct:
+return_void:
     jalr    t4 # call the function
-   
-epilogue:   
+
+epilogue:
     add     sp, fp, zero               # Fix stack pointer
     REG_L   fp, -FFI_SIZEOF_ARG_X2(sp)  # Restore frame pointer
-    REG_L   ra, -FFI_SIZEOF_ARG_X1(sp)  # Restore return address      
+    REG_L   ra, -FFI_SIZEOF_ARG_X1(sp)  # Restore return address
     jr      ra
-    
+
     .cfi_endproc
     .size   ffi_call_asm, .-ffi_call_asm
 
-    
+
 /* ffi_closure_asm. Expects address of the passed-in ffi_closure in t0. */
 
 #define SIZEOF_FRAME2 (20 * FFI_SIZEOF_ARG)
@@ -669,14 +669,14 @@ ffi_closure_asm:
     .cfi_startproc
 
     addi    sp,  sp, -SIZEOF_FRAME2
-    
+
     .cfi_def_cfa_offset SIZEOF_FRAME2
-    
+
     REG_S   ra,  RA_OFF2(sp) # Save return address
-    
+
     .cfi_offset  1, -19*FFI_SIZEOF_ARG
     .cfi_def_cfa 2, SIZEOF_FRAME2
-    
+
     # Store all possible argument registers. If there are more than
     # fit in registers, then they were stored on the stack.
     REG_S   a0,  A0_OFF2(sp)
@@ -687,7 +687,7 @@ ffi_closure_asm:
     REG_S   a5,  A5_OFF2(sp)
     REG_S   a6,  A6_OFF2(sp)
     REG_S   a7,  A7_OFF2(sp)
-    
+
     # Store all possible float/double registers.
     fsd     fa0, FA0_OFF2(sp)
     fsd     fa1, FA1_OFF2(sp)
@@ -697,87 +697,87 @@ ffi_closure_asm:
     fsd     fa5, FA5_OFF2(sp)
     fsd     fa6, FA6_OFF2(sp)
     fsd     fa7, FA7_OFF2(sp)
-    
+
     # Call ffi_closure_riscv_inner to do the real work.
     move    a0, t0 # Pointer to the ffi_closure
     addi    a1, sp, V0_OFF2
     addi    a2, sp, A0_OFF2
     addi    a3, sp, FA0_OFF2
     call    ffi_closure_riscv_inner
-    
+
     # Return flags are in a0
     li      t0, FFI_TYPE_INT
     bne     a0, t0, cls_retint32
     REG_L   a0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retint32:
     li      t0, FFI_TYPE_SINT32
     bne     a0, t0, cls_retfloat
     lw      a0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retfloat:
     li      t0, FFI_TYPE_FLOAT
     bne     a0, t0, cls_retdouble
     flw     fa0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retdouble:
     li      t0,  FFI_TYPE_DOUBLE
     bne     a0,  t0, cls_retstruct_d
     fld     fa0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_d:
     li      t0,  FFI_TYPE_STRUCT_D
     bne     a0,  t0, cls_retstruct_f
     fld     fa0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_f:
     li      t0,  FFI_TYPE_STRUCT_F
     bne     a0,  t0, cls_retstruct_d_d
     flw     fa0, V0_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_d_d:
     li      t0,  FFI_TYPE_STRUCT_DD
     bne     a0,  t0, cls_retstruct_f_f
     fld     fa0, V0_OFF2(sp)
     fld     fa1, V1_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_f_f:
     li      t0,  FFI_TYPE_STRUCT_FF
     bne     a0,  t0, cls_retstruct_d_f
     flw     fa0, V0_OFF2(sp)
     flw     fa1, V1_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_d_f:
     li      t0,  FFI_TYPE_STRUCT_DF
     bne     a0,  t0, cls_retstruct_f_d
     fld     fa0, V0_OFF2(sp)
     flw     fa1, V1_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_f_d:
     li      t0,  FFI_TYPE_STRUCT_FD
     bne     a0,  t0, cls_retstruct_small2
     flw     fa0, V0_OFF2(sp)
     fld     fa1, V1_OFF2(sp)
     j       cls_epilogue
-    
+
 cls_retstruct_small2:
     REG_L   a0, V0_OFF2(sp)
     REG_L   a1, V1_OFF2(sp)
-    
+
 # Epilogue
 cls_epilogue:
     REG_L   ra, RA_OFF2(sp) # Restore return address
     addi    sp, sp, SIZEOF_FRAME2
     ret
-    
+
     .cfi_endproc
     .size ffi_closure_asm, .-ffi_closure_asm

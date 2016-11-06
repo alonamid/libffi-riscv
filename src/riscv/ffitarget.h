@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------*-C-*-
    ffitarget.h - 2014 Michael Knyszek
-   
+
    Target configuration macros for RISC-V.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -44,7 +44,7 @@
 
 #ifndef LIBFFI_ASM
 
-typedef unsigned long ffi_arg; 
+typedef unsigned long ffi_arg;
 typedef   signed long ffi_sarg;
 
 typedef enum ffi_abi {
