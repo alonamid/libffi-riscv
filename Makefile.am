@@ -143,7 +143,7 @@ EXTRA_libffi_la_SOURCES = \
 	 src/powerpc/linux64_closure.S src/powerpc/ppc_closure.S	\
 	 src/powerpc/aix.S src/powerpc/darwin.S src/powerpc/aix_closure.S \
 	 src/powerpc/darwin_closure.S src/powerpc/ffi_darwin.c		\
-        src/riscv/ffi.c src/riscv/rv32.S src/riscv/rv64.S               \
+        src/riscv/ffi.c src/riscv/sysv.S                                \
 	src/s390/ffi.c src/s390/sysv.S					\
 	src/sh/ffi.c src/sh/sysv.S					\
 	src/sh64/ffi.c src/sh64/sysv.S					\

@@ -32,9 +32,9 @@
 #error "Please do not include ffitarget.h directly into your source.  Use ffi.h instead."
 #endif
 
-#ifndef __riscv64
-# error We currently only support RV64.
-#endif
+//#ifndef __riscv64
+//# error We currently only support RV64.
+//#endif
 
 #ifdef __LP64__
 # define FFI_SIZEOF_ARG 8
