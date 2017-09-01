@@ -189,6 +189,10 @@ case "${host}" in
 	TARGET=POWERPC; TARGETDIR=powerpc
 	;;
 
+  riscv | riscv-* | riscv64-*)
+        TARGET=RISCV; TARGETDIR=riscv;
+        ;;
+
   s390-*-* | s390x-*-*)
 	TARGET=S390; TARGETDIR=s390
 	SOURCES="ffi.c sysv.S"
@@ -242,6 +246,9 @@ case "${TARGET}" in
   POWERPC_FREEBSD)
 	SOURCES="ffi.c ffi_sysv.c sysv.S ppc_closure.S"
 	;;
+  RISCV)
+        SOURCES="ffi.c rv64.S rv32.S"
+        ;;
   X86 | X86_DARWIN | X86_FREEBSD | X86_WIN32)
 	SOURCES="ffi.c sysv.S"
 	;;
