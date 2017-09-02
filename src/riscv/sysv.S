@@ -126,7 +126,7 @@ thirtytwo:
 
     # time to load the arguments for the call
 
-#ifndef __riscv_soft_float
+#ifndef __riscv_float_abi_soft
 
 ####################
 ## SET ARGUMENT 0 ##
@@ -373,7 +373,7 @@ call_it:
 
 return_int32:
     ori     t3, zero, FFI_TYPE_SINT32
-#ifndef __riscv_soft_float
+#ifndef __riscv_float_abi_soft
     bne     t2, t3, return_float
 #else
     bne     t2, t3, return_struct_d_soft
@@ -387,7 +387,7 @@ return_int32:
     sw      a0, 0(t0)
     j       epilogue
     
-#ifndef __riscv_soft_float
+#ifndef __riscv_float_abi_soft
 return_float:
     # is the return type a float? if not, jump ahead
     ori     t3, zero, FFI_TYPE_FLOAT

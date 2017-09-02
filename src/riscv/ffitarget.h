@@ -57,24 +57,26 @@ typedef enum ffi_abi {
   FFI_RV64_SOFT_FLOAT,
   FFI_LAST_ABI,
 
-#ifdef __riscv64
-  #ifdef __riscv_soft_float
+#if __riscv_xlen == 64
+   #ifdef __riscv_float_abi_soft
     FFI_DEFAULT_ABI = FFI_RV64_SOFT_FLOAT
   #else
     FFI_DEFAULT_ABI = FFI_RV64
   #endif
-#else
-  #ifdef __riscv_soft_float
+#elif __riscv_xlen == 32
+   #ifdef __riscv_float_abi_soft
     FFI_DEFAULT_ABI = FFI_RV32_SOFT_FLOAT
   #else
     FFI_DEFAULT_ABI = FFI_RV32
   #endif
+#else
+   #error Unknown RISC-V ABI.
 #endif /* __riscv_soft_float */
 } ffi_abi;
 
 #else
 
-#ifdef __riscv64
+#if __riscv_xlen == 64
   #define REG_S sd
   #define REG_L ld
 #else
