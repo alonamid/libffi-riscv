@@ -32,7 +32,7 @@
 #error "Please do not include ffitarget.h directly into your source.  Use ffi.h instead."
 #endif
 
-//#ifndef __riscv64
+//#ifndef _riscv_xlen == 64
 //# error We currently only support RV64.
 //#endif
 

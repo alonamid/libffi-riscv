@@ -80,7 +80,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
             /* The size of a pointer depends on the ABI */
             if (type == FFI_TYPE_POINTER)
-            #ifdef __riscv64
+            #ifdef _riscv_xlen == 64
                 type = FFI_TYPE_SINT64;
             #else
                 type = FFI_TYPE_SINT32;
