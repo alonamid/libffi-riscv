@@ -510,6 +510,7 @@ return_struct_f_d:
   # or equal to 2 pointer-words in size. We
   # need to specifically handle the floats/doubles.
 
+#if __riscv_xlen != 32
 return_struct_d_soft:
     # is the return type a struct with a double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_D_SOFT
@@ -523,6 +524,8 @@ return_struct_d_soft:
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
     
+#endif
+
 return_struct_f_soft:
     # is the return type a struct with a float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_F_SOFT
@@ -535,7 +538,8 @@ return_struct_f_soft:
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
+
+#if __riscv_xlen != 32    
 return_struct_d_d_soft:
     # is the return type a struct with two doubles? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DD_SOFT
@@ -550,6 +554,8 @@ return_struct_d_d_soft:
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
     
+#endif
+
 return_struct_f_f_soft:
     # is the return type a struct with two floats? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FF_SOFT
@@ -563,7 +569,8 @@ return_struct_f_f_soft:
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
+#if __riscv_xlen != 32    
 return_struct_d_f_soft:
     # is the return type a struct with a double then float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DF_SOFT
@@ -578,6 +585,9 @@ return_struct_d_f_soft:
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
     
+#endif
+
+#if __riscv_xlen != 32
 return_struct_f_d_soft:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FD_SOFT
@@ -592,6 +602,7 @@ return_struct_f_d_soft:
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
     
+#endif
 #endif    
 
 ### Handle struct special cases (tiny structs)
