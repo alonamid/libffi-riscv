@@ -43,7 +43,15 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
     void **p_argv;
     char *argp, *cpy_struct;
     ffi_type **p_arg;
-    
+   
+    printf("FFI_RV64_SINGLE=%d\n", FFI_RV64_SINGLE);
+    printf("FFI_RV64_SOFT_FLOAT=%d\n", FFI_RV64_SOFT_FLOAT);
+    printf("FFI_RV64_DOUBLE=%d\n", FFI_RV64_DOUBLE);
+    printf("FFI_DEFAULT_ABI=%d\n", FFI_DEFAULT_ABI);
+    printf("__riscv_xlen=%d\n", __riscv_xlen);
+    printf("__riscv_flen=%d\n", __riscv_flen);
+
+ 
     argp = stack;
     cpy_struct = stack + ALIGN(bytes, 16);
 
@@ -80,12 +88,13 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
             /* The size of a pointer depends on the ABI */
             if (type == FFI_TYPE_POINTER)
-            #ifdef _riscv_xlen == 64
+            #if _riscv_xlen == 64
                 type = FFI_TYPE_SINT64;
             #else
                 type = FFI_TYPE_SINT32;
             #endif
-            
+           
+            /* handle "soft" float */ 
             if (i < 8 && (ecif->cif->abi == FFI_RV32_SOFT_FLOAT || ecif->cif->abi == FFI_RV64_SOFT_FLOAT))
             {
                 switch (type)
@@ -100,6 +109,20 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                         break;
                 }
             }
+
+            /* single precision FPU handles double as "soft" */
+            if (i<8 && (ecif->cif->abi == FFI_RV64_SINGLE || ecif->cif->abi == FFI_RV32_SINGLE))
+            {
+                switch (type)
+                {
+                    case FFI_TYPE_DOUBLE:
+                        type = FFI_TYPE_UINT64;
+                        break;
+                    default:
+                        break;
+                }
+            }
+ 
             
             switch (type)
             {
@@ -310,6 +333,7 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     
     unsigned int struct_flags = 0;
     int soft_float = cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT;;
+    int soft_double = cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV32_SINGLE;;
     
     cif->flags = 0;
     
@@ -329,7 +353,9 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     }
     else
         cif->rstruct_flag = 0;
-    
+   
+    printf("cif->rstruct_flag=%x\n",cif->rstruct_flag);
+
     /* Set the first 8 existing argument types in the flag bit string
      * 
      * We only describe the two argument types we care about:
@@ -343,7 +369,6 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
      * 
      * FFI_FLAG_BITS = 2
      */
-    
     while (count-- > 0 && arg_reg < 8)
     {
         type = (cif->arg_types)[index]->type;
@@ -356,6 +381,17 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
                 case FFI_TYPE_FLOAT:
                     type = FFI_TYPE_UINT32;
                     break;
+                case FFI_TYPE_DOUBLE:
+                    type = FFI_TYPE_UINT64;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (soft_double || (isvariadic && arg_reg >= nfixedargs))
+        {
+            switch (type)
+            {
                 case FFI_TYPE_DOUBLE:
                     type = FFI_TYPE_UINT64;
                     break;
@@ -381,6 +417,7 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
         index++;
     }
     
+    printf("before setting return type cif->flags=%x\n",cif->flags);
     /* Set the return type flag */
     
     type = cif->rtype->type;
@@ -401,6 +438,18 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
         }
     }
     
+    if (soft_double)
+    {
+        switch (type)
+        {
+            case FFI_TYPE_DOUBLE:
+                type = FFI_TYPE_UINT64;
+                break;
+            default:
+                break;
+        }
+    }
+
     switch (type)
     {
         case FFI_TYPE_STRUCT:
@@ -439,7 +488,10 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
     int i;
     ffi_type **ptr;
     unsigned bytes = 0, extra_bytes = 0;
-    
+   
+    int soft_float = cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT;;
+    int soft_double = cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV32_SINGLE;;
+ 
     if (cif->rtype->type == FFI_TYPE_STRUCT)
         bytes = STACK_ARG_SIZE(sizeof(void*));
     
@@ -476,6 +528,7 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
     ffi_prep_cif_machdep_bytes(cif);
     ffi_prep_cif_machdep_flags(cif, 0, 0);
     cif->isvariadic = 0;
+    printf("cif flags is %x\n", cif->flags);
     return FFI_OK;
 }
 
@@ -525,10 +578,10 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
     FFI_ASSERT(tramp == codeloc);
     
     /* Remove when more than just rv64 is supported */
-    if (cif->abi != FFI_RV64)
+    if (cif->abi != FFI_RV64_SINGLE || cif->abi != FFI_RV64_DOUBLE)
         return FFI_BAD_ABI;
     
-    if (cif->abi == FFI_RV32 || cif->abi == FFI_RV32_SOFT_FLOAT || fn < 0x7ffff000U)
+    if (cif->abi == FFI_RV32_SINGLE || cif->abi == FFI_RV32_DOUBLE || cif->abi == FFI_RV32_SOFT_FLOAT || fn < 0x7ffff000U)
     {
         /* auipc t0, 0 (i.e. t0 <- codeloc) */
         tramp[0] = 0x00000297;
@@ -664,7 +717,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
             
             /* The size of a pointer depends on the ABI */
             if (type == FFI_TYPE_POINTER)
-                type = (cif->abi == FFI_RV64 || cif->abi == FFI_RV64_SOFT_FLOAT) ? FFI_TYPE_SINT64 : FFI_TYPE_SINT32;
+                type = (cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV64_DOUBLE || cif->abi == FFI_RV64_SOFT_FLOAT) ? FFI_TYPE_SINT64 : FFI_TYPE_SINT32;
             if (soft_float && type == FFI_TYPE_FLOAT)
                 type = FFI_TYPE_UINT32;
             

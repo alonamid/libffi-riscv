@@ -51,23 +51,35 @@ typedef   signed long ffi_sarg;
 
 typedef enum ffi_abi {
   FFI_FIRST_ABI = 0,
-  FFI_RV32,
+  //FFI_RV32,
+  FFI_RV32_SINGLE,
+  FFI_RV32_DOUBLE,
   FFI_RV32_SOFT_FLOAT,
-  FFI_RV64,
+  //FFI_RV64,
+  FFI_RV64_SINGLE,
+  FFI_RV64_DOUBLE,
   FFI_RV64_SOFT_FLOAT,
   FFI_LAST_ABI,
 
 #if __riscv_xlen == 64
    #ifdef __riscv_float_abi_soft
     FFI_DEFAULT_ABI = FFI_RV64_SOFT_FLOAT
-  #else
-    FFI_DEFAULT_ABI = FFI_RV64
+   #elif  __riscv_float_abi_single
+    FFI_DEFAULT_ABI = FFI_RV64_SINGLE
+   #else
+    FFI_DEFAULT_ABI = FFI_RV64_DOUBLE
+//  #else
+//    FFI_DEFAULT_ABI = FFI_RV64
   #endif
 #elif __riscv_xlen == 32
    #ifdef __riscv_float_abi_soft
     FFI_DEFAULT_ABI = FFI_RV32_SOFT_FLOAT
-  #else
-    FFI_DEFAULT_ABI = FFI_RV32
+   #elif __riscv_float_abi_single
+    FFI_DEFAULT_ABI = FFI_RV32_SINGLE
+   #else
+    FFI_DEFAULT_ABI - FFI_RV32_DOUBLE
+//  #else
+//    FFI_DEFAULT_ABI = FFI_RV32
   #endif
 #else
    #error Unknown RISC-V ABI.

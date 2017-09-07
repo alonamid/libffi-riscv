@@ -391,8 +391,8 @@ return_int32:
 return_float:
     # is the return type a float? if not, jump ahead
     ori     t3, zero, FFI_TYPE_FLOAT
-    bne     t2, t3, return_double
-    
+    bne     t2, t3, return_struct_f
+
     jalr    t4 # call the function
     
     # We reload the return pointer because it was in a temp reg and
@@ -423,7 +423,7 @@ return_double:
 return_struct_d:
     # is the return type a struct with a double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_D
-    bne     t2, t3,   return_struct_f
+    bne     t2, t3,   return_struct_d_d
     
     jalr    t4 # call the function
     
@@ -436,7 +436,7 @@ return_struct_d:
 return_struct_f:
     # is the return type a struct with a float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_F
-    bne     t2, t3,   return_struct_d_d
+    bne     t2, t3,   return_struct_f_f
     
     jalr    t4 # call the function
     
@@ -449,7 +449,7 @@ return_struct_f:
 return_struct_d_d:
     # is the return type a struct with two doubles? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DD
-    bne     t2, t3,   return_struct_f_f
+    bne     t2, t3,   return_struct_d_f
     
     jalr    t4 # call the function
     
@@ -463,7 +463,11 @@ return_struct_d_d:
 return_struct_f_f:
     # is the return type a struct with two floats? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FF
-    bne     t2, t3,   return_struct_d_f
+#ifdef __riscv_float_abi_double
+    bne     t2, t3,   return_double
+#else
+    bne     t2, t3,   return_struct_d_d_soft
+#endif
     
     jalr    t4 # call the function
     
@@ -510,7 +514,6 @@ return_struct_f_d:
   # or equal to 2 pointer-words in size. We
   # need to specifically handle the floats/doubles.
 
-#if __riscv_xlen != 32
 return_struct_d_soft:
     # is the return type a struct with a double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_D_SOFT
@@ -523,8 +526,6 @@ return_struct_d_soft:
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
-    
-#endif
 
 return_struct_f_soft:
     # is the return type a struct with a float? if not, give up
@@ -539,7 +540,6 @@ return_struct_f_soft:
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     j       epilogue
 
-#if __riscv_xlen != 32    
 return_struct_d_d_soft:
     # is the return type a struct with two doubles? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DD_SOFT
@@ -554,8 +554,6 @@ return_struct_d_d_soft:
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
     
-#endif
-
 return_struct_f_f_soft:
     # is the return type a struct with two floats? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FF_SOFT
@@ -570,7 +568,6 @@ return_struct_f_f_soft:
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
 
-#if __riscv_xlen != 32    
 return_struct_d_f_soft:
     # is the return type a struct with a double then float? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_DF_SOFT
@@ -584,10 +581,7 @@ return_struct_d_f_soft:
     sd      a0,  FFI_SIZEOF_ARG_X0(t0)
     sw      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
-#endif
 
-#if __riscv_xlen != 32
 return_struct_f_d_soft:
     # is the return type a struct with a float then double? if not, give up
     ori     t3, zero, FFI_TYPE_STRUCT_FD_SOFT
@@ -601,9 +595,8 @@ return_struct_f_d_soft:
     sw      a0,  FFI_SIZEOF_ARG_X0(t0)
     sd      a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
-    
+
 #endif
-#endif    
 
 ### Handle struct special cases (tiny structs)
 
@@ -698,7 +691,7 @@ ffi_closure_asm:
     REG_S   a6,  A6_OFF2(sp)
     REG_S   a7,  A7_OFF2(sp)
    
-#ifndef __riscv_float_abi_soft 
+#ifdef __riscv_float_abi_double 
     # Store all possible float/double registers.
     fsd     fa0, FA0_OFF2(sp)
     fsd     fa1, FA1_OFF2(sp)
@@ -709,6 +702,20 @@ ffi_closure_asm:
     fsd     fa6, FA6_OFF2(sp)
     fsd     fa7, FA7_OFF2(sp)
 #endif
+
+
+#ifdef __riscv_float_abi_single
+    # Store all possible float registers.
+    fsw     fa0, FA0_OFF2(sp)
+    fsw     fa1, FA1_OFF2(sp)
+    fsw     fa2, FA2_OFF2(sp)
+    fsw     fa3, FA3_OFF2(sp)
+    fsw     fa4, FA4_OFF2(sp)
+    fsw     fa5, FA5_OFF2(sp)
+    fsw     fa6, FA6_OFF2(sp)
+    fsw     fa7, FA7_OFF2(sp)
+#endif
+
     
     # Call ffi_closure_riscv_inner to do the real work.
     move    a0, t0 # Pointer to the ffi_closure
@@ -729,13 +736,11 @@ cls_retint32:
     lw      a0, V0_OFF2(sp)
     j       cls_epilogue
    
-#ifndef __riscv_float_abi_soft 
 cls_retfloat:
     li      t0, FFI_TYPE_FLOAT
     bne     a0, t0, cls_retdouble
     flw     fa0, V0_OFF2(sp)
     j       cls_epilogue
-#endif
     
 cls_retdouble:
     li      t0,  FFI_TYPE_DOUBLE
