@@ -48,16 +48,35 @@
 #define FFI_SIZEOF_ARG_X7 (7 * FFI_SIZEOF_ARG)
 #define FFI_SIZEOF_ARG_X8 (8 * FFI_SIZEOF_ARG)
 
+#define FFI_SIZEOF_ARG_F0 (0 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F1 (1 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F2 (2 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F3 (3 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F4 (4 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F5 (5 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F6 (6 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F7 (7 * FFI_SIZEOF_ARG)
+#define FFI_SIZEOF_ARG_F8 (8 * FFI_SIZEOF_ARG)
+
 #define ARG_MASK 65535
 
-#define FFI_FLAG_BITS_X0 (0 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X1 (1 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X2 (2 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X3 (3 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X4 (4 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X5 (5 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X6 (6 * FFI_FLAG_BITS)
-#define FFI_FLAG_BITS_X7 (7 * FFI_FLAG_BITS)
+#define FFI_FLAG_BITS_X0 (0)
+#define FFI_FLAG_BITS_X1 (1)
+#define FFI_FLAG_BITS_X2 (2)
+#define FFI_FLAG_BITS_X3 (3)
+#define FFI_FLAG_BITS_X4 (4)
+#define FFI_FLAG_BITS_X5 (5)
+#define FFI_FLAG_BITS_X6 (6)
+#define FFI_FLAG_BITS_X7 (7)
+
+#define FFI_FLAG_BITS_F0 (0)
+#define FFI_FLAG_BITS_F1 (1)
+#define FFI_FLAG_BITS_F2 (2)
+#define FFI_FLAG_BITS_F3 (3)
+#define FFI_FLAG_BITS_F4 (4)
+#define FFI_FLAG_BITS_F5 (5)
+#define FFI_FLAG_BITS_F6 (6)
+#define FFI_FLAG_BITS_F7 (7)
 
 # Stack pointer needs to be 16-byte aligned, so frame size is rounded up
 #define SIZEOF_FRAME (6 * FFI_SIZEOF_ARG)
@@ -132,205 +151,148 @@ thirtytwo:
 ## SET ARGUMENT 0 ##
 ####################
 
-set_arg0:
-    srli    t1, t0, FFI_FLAG_BITS_X0 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg0_float 
-    REG_L   a0, FFI_SIZEOF_ARG_X0(sp) # load argument
-    j       set_arg1
-    
 set_arg0_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F0 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg0_double
-    flw     fa0, FFI_SIZEOF_ARG_X0(sp) # load argument
-    j       set_arg1
+    bne     t1, zero, set_arg0_double 
+    flw     fa0, FFI_SIZEOF_ARG_F0(sp) # load argument
+    j       set_arg1_float
     
 set_arg0_double:
     # otherwise it must be a double we're dealing with
-    fld     fa0, FFI_SIZEOF_ARG_X0(sp)
+    fld     fa0, FFI_SIZEOF_ARG_F0(sp)
 
 ####################
 ## SET ARGUMENT 1 ##
 ####################
 
-set_arg1:
-    srli    t1, t0, FFI_FLAG_BITS_X1 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg1_float 
-    REG_L   a1, FFI_SIZEOF_ARG_X1(sp) # load argument
-    j       set_arg2
-    
 set_arg1_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F1 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg1_double
-    flw     fa1, FFI_SIZEOF_ARG_X1(sp) # load argument
-    j       set_arg2
+    bne     t1, zero, set_arg1_double 
+    flw     fa1, FFI_SIZEOF_ARG_F1(sp) # load argument
+    j       set_arg2_float
     
 set_arg1_double:
     # otherwise it must be a double we're dealing with
-    fld     fa1, FFI_SIZEOF_ARG_X1(sp)
+    fld     fa1, FFI_SIZEOF_ARG_F1(sp)
 
 ####################
 ## SET ARGUMENT 2 ##
 ####################
 
-set_arg2:
-    srli    t1, t0, FFI_FLAG_BITS_X2 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg2_float 
-    REG_L   a2, FFI_SIZEOF_ARG_X2(sp) # load argument
-    j       set_arg3
-    
 set_arg2_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F2 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg2_double
-    flw     fa2, FFI_SIZEOF_ARG_X2(sp) # load argument
-    j       set_arg3
+    bne     t1, zero, set_arg2_double 
+    flw     fa2, FFI_SIZEOF_ARG_F2(sp) # load argument
+    j       set_arg3_float
     
 set_arg2_double:
     # otherwise it must be a double we're dealing with
-    fld     fa2, FFI_SIZEOF_ARG_X2(sp)
+    fld     fa2, FFI_SIZEOF_ARG_F2(sp)
 
 ####################
 ## SET ARGUMENT 3 ##
 ####################
 
-set_arg3:
-    srli    t1, t0, FFI_FLAG_BITS_X3 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg3_float 
-    REG_L   a3, FFI_SIZEOF_ARG_X3(sp) # load argument
-    j       set_arg4
-    
 set_arg3_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F3 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg3_double
-    flw     fa3, FFI_SIZEOF_ARG_X3(sp) # load argument
-    j       set_arg4
+    bne     t1, zero, set_arg3_double 
+    flw     fa3, FFI_SIZEOF_ARG_F3(sp) # load argument
+    j       set_arg4_float
     
 set_arg3_double:
     # otherwise it must be a double we're dealing with
-    fld     fa3, FFI_SIZEOF_ARG_X3(sp)
+    fld     fa3, FFI_SIZEOF_ARG_F3(sp)
 
 ####################
 ## SET ARGUMENT 4 ##
 ####################
 
-set_arg4:
-    srli    t1, t0, FFI_FLAG_BITS_X4 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg4_float 
-    REG_L   a4, FFI_SIZEOF_ARG_X4(sp) # load argument
-    j       set_arg5
-    
 set_arg4_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F4 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg4_double
-    flw     fa4, FFI_SIZEOF_ARG_X4(sp) # load argument
-    j       set_arg5
+    bne     t1, zero, set_arg4_double 
+    flw     fa4, FFI_SIZEOF_ARG_F4(sp) # load argument
+    j       set_arg5_float
     
 set_arg4_double:
     # otherwise it must be a double we're dealing with
-    fld     fa4, FFI_SIZEOF_ARG_X4(sp)
+    fld     fa4, FFI_SIZEOF_ARG_F4(sp)
 
 ####################
 ## SET ARGUMENT 5 ##
 ####################
 
-set_arg5:
-    srli    t1, t0, FFI_FLAG_BITS_X5 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg5_float 
-    REG_L   a5, FFI_SIZEOF_ARG_X5(sp) # load argument
-    j       set_arg6
-    
 set_arg5_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F5 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg5_double
-    flw     fa5, FFI_SIZEOF_ARG_X5(sp) # load argument
-    j       set_arg6
+    bne     t1, zero, set_arg5_double 
+    flw     fa5, FFI_SIZEOF_ARG_F5(sp) # load argument
+    j       set_arg6_float
     
 set_arg5_double:
     # otherwise it must be a double we're dealing with
-    fld     fa5, FFI_SIZEOF_ARG_X5(sp)
+    fld     fa5, FFI_SIZEOF_ARG_F5(sp)
 
 ####################
 ## SET ARGUMENT 6 ##
 ####################
 
-set_arg6:
-    srli    t1, t0, FFI_FLAG_BITS_X6 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg6_float 
-    REG_L   a6, FFI_SIZEOF_ARG_X6(sp) # load argument
-    j       set_arg7
-    
 set_arg6_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F6 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg6_double
-    flw     fa6, FFI_SIZEOF_ARG_X6(sp) # load argument
-    j       set_arg7
+    bne     t1, zero, set_arg6_double 
+    flw     fa6, FFI_SIZEOF_ARG_F6(sp) # load argument
+    j       set_arg7_float
     
 set_arg6_double:
     # otherwise it must be a double we're dealing with
-    fld     fa6, FFI_SIZEOF_ARG_X6(sp)
+    fld     fa6, FFI_SIZEOF_ARG_F6(sp)
 
 ####################
 ## SET ARGUMENT 7 ##
 ####################
 
-set_arg7:
-    srli    t1, t0, FFI_FLAG_BITS_X7 # Shift to get the bits for this argument
-    andi    t1, t1, 3               # Mask out the bits for this argument
-    
-    # when its zero, it means its just a word-sized int/ptr
-    bne     t1, zero, set_arg7_float 
-    REG_L   a7, FFI_SIZEOF_ARG_X7(sp) # load argument
-    j       call_it
-    
 set_arg7_float:
-    addi    t1, t1, -2
+    srli    t1, t0, FFI_FLAG_BITS_F7 # Shift to get the bits for this argument
+    andi    t1, t1, 1               # Mask out the bits for this argument
     
     # when its zero, it means its just a word-sized float
-    bne     t1, zero, set_arg7_double
-    flw     fa7, FFI_SIZEOF_ARG_X7(sp) # load argument
-    j       call_it
+    bne     t1, zero, set_arg7_double 
+    flw     fa7, FFI_SIZEOF_ARG_F7(sp) # load argument
+    j       finish_fregs
     
 set_arg7_double:
     # otherwise it must be a double we're dealing with
-    fld     fa7, FFI_SIZEOF_ARG_X7(sp)
-    
-#else
+    fld     fa7, FFI_SIZEOF_ARG_F7(sp)
 
-## START RISCV SOFT-FLOAT LOADING ##
+
+
+finish_fregs:
+    add     sp, sp, FFI_SIZEOF_ARG_F8  //move stack pointer to beginning of integer arguments
+#endif 
+
+
+set_int_args: 
+    srli    t0, t0, 8                  //shift out the integer argument flags
+## START RISCV INTEGER REGISTER LOADING ##
 
     # In the soft-float case, we have no primitive datatype
     # that has a size of >8 bytes. Therefore, we can 
@@ -345,7 +307,6 @@ set_arg7_double:
     REG_L   a6, FFI_SIZEOF_ARG_X6(sp) # load argument
     REG_L   a7, FFI_SIZEOF_ARG_X7(sp) # load argument
 
-#endif  
 
 call_it:
     # First, we fix the stack pointer to point to the first argument
@@ -404,7 +365,7 @@ return_float:
 return_double:
     # is the return type a double? if not, give up
     ori     t3, zero, FFI_TYPE_DOUBLE
-    bne     t2, t3, return_struct_d
+    bne     t2, t3, return_longdouble
     
     jalr    t4 # call the function
     
@@ -412,6 +373,20 @@ return_double:
     # there was just a function call.
     REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
     fsd     fa0, FFI_SIZEOF_ARG_X0(t0)
+    j       epilogue
+
+return_longdouble:
+    # is the return type a double? if not, give up
+    ori     t3, zero, FFI_TYPE_LONGDOUBLE
+    bne     t2, t3, return_struct_d
+    
+    jalr    t4 # call the function
+    
+    # We reload the return pointer because it was in a temp reg and
+    # there was just a function call.
+    REG_L   t0,  -FFI_SIZEOF_ARG_X5(fp)
+    REG_S   a0,  FFI_SIZEOF_ARG_X0(t0)
+    REG_S   a1,  FFI_SIZEOF_ARG_X1(t0)
     j       epilogue
 
 ### Handle struct special cases (hard float)
@@ -744,10 +719,17 @@ cls_retfloat:
     
 cls_retdouble:
     li      t0,  FFI_TYPE_DOUBLE
-    bne     a0,  t0, cls_retstruct_d
+    bne     a0,  t0, cls_retlongdouble
     fld     fa0, V0_OFF2(sp)
     j       cls_epilogue
     
+cls_retlongdouble:
+    li      t0,  FFI_TYPE_LONGDOUBLE
+    bne     a0,  t0, cls_retstruct_d
+    ld      a0, V0_OFF2(sp)
+    ld      a1, V1_OFF2(sp)
+    j       cls_epilogue
+
 cls_retstruct_d:
     li      t0,  FFI_TYPE_STRUCT_D
     bne     a0,  t0, cls_retstruct_f
