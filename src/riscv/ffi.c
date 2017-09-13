@@ -54,6 +54,8 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
     //printf("bytes is %d\n", bytes);
 
     ffi_cif* wcif = ecif->cif; //working cif
+    char isvariadic = wcif->isvariadic;
+    int nfixedargs = wcif->nfixedargs;
 
     int max_fp_reg_size = (wcif->abi == FFI_RV64_DOUBLE || wcif->abi == FFI_RV32_DOUBLE) ? 64 : 
                              ((wcif->abi == FFI_RV64_SOFT_FLOAT || wcif->abi == FFI_RV32_SOFT_FLOAT) ? 0 : 32); //this can be expanded to 128 for QUAD if needed
@@ -140,7 +142,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
 
             /* Handle float argument types for soft float case */ 
-            if (xreg<8 && ((max_fp_reg_size < 32) || freg>7))
+            if (xreg<8 && ((max_fp_reg_size < 32) || freg>7) || (isvariadic & i>=nfixedargs))
             {
                 switch (type)
                 {
@@ -153,7 +155,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
             }
         
 
-            if (xreg<8 && ((max_fp_reg_size < 64) || freg>7))
+            if (xreg<8 && ((max_fp_reg_size < 64) || freg>7) || (isvariadic & i>=nfixedargs))
             {
                 switch (type)
                 {
@@ -424,7 +426,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
             memcpy(argp, *p_argv, z);
             argp += z;
         }
-        
         p_argv++;
     }
 }
@@ -616,9 +617,15 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
                 }
                 break;
             case FFI_TYPE_LONGDOUBLE: /* goes in integer registers */
+                if (xarg_reg < 7)
+                {
+                    temp_int_flags += 0 << (xarg_reg+1);
+                    xarg_reg+=2;
+                }
+                else if (xarg_reg < 8)
                 {
                     temp_int_flags += 0 << (xarg_reg);
-                    xarg_reg+=2;
+                    xarg_reg++;                    
                 }
                 break;
             case FFI_TYPE_STRUCT:
@@ -808,6 +815,7 @@ ffi_status ffi_prep_cif_machdep_var(ffi_cif *cif, unsigned int nfixedargs, unsig
     ffi_prep_cif_machdep_bytes(cif);
     ffi_prep_cif_machdep_flags(cif, 1, nfixedargs);
     cif->isvariadic = 1;
+    cif->nfixedargs = nfixedargs;
     return FFI_OK;
 }
 
