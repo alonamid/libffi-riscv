@@ -157,6 +157,8 @@ set_arg0_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg0_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, FFI_SIZEOF_ARG_F0(sp) # load argument
     j       set_arg1_float
     
@@ -174,6 +176,8 @@ set_arg1_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg1_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa1, t5 # initialize register to Nan
     flw     fa1, FFI_SIZEOF_ARG_F1(sp) # load argument
     j       set_arg2_float
     
@@ -191,6 +195,8 @@ set_arg2_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg2_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa2, t5 # initialize register to Nan
     flw     fa2, FFI_SIZEOF_ARG_F2(sp) # load argument
     j       set_arg3_float
     
@@ -208,6 +214,8 @@ set_arg3_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg3_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa3, t5 # initialize register to Nan
     flw     fa3, FFI_SIZEOF_ARG_F3(sp) # load argument
     j       set_arg4_float
     
@@ -225,6 +233,8 @@ set_arg4_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg4_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa4, t5 # initialize register to Nan
     flw     fa4, FFI_SIZEOF_ARG_F4(sp) # load argument
     j       set_arg5_float
     
@@ -242,6 +252,8 @@ set_arg5_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg5_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa5, t5 # initialize register to Nan
     flw     fa5, FFI_SIZEOF_ARG_F5(sp) # load argument
     j       set_arg6_float
     
@@ -259,6 +271,8 @@ set_arg6_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg6_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa6, t5 # initialize register to Nan
     flw     fa6, FFI_SIZEOF_ARG_F6(sp) # load argument
     j       set_arg7_float
     
@@ -276,6 +290,8 @@ set_arg7_float:
     
     # when its zero, it means its just a word-sized float
     bne     t1, zero, set_arg7_double 
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa7, t5 # initialize register to Nan
     flw     fa7, FFI_SIZEOF_ARG_F7(sp) # load argument
     j       finish_fregs
     
@@ -714,6 +730,8 @@ cls_retint32:
 cls_retfloat:
     li      t0, FFI_TYPE_FLOAT
     bne     a0, t0, cls_retdouble
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, V0_OFF2(sp)
     j       cls_epilogue
     
@@ -739,6 +757,8 @@ cls_retstruct_d:
 cls_retstruct_f:
     li      t0,  FFI_TYPE_STRUCT_F
     bne     a0,  t0, cls_retstruct_d_d
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, V0_OFF2(sp)
     j       cls_epilogue
     
@@ -752,6 +772,8 @@ cls_retstruct_d_d:
 cls_retstruct_f_f:
     li      t0,  FFI_TYPE_STRUCT_FF
     bne     a0,  t0, cls_retstruct_d_f
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, V0_OFF2(sp)
     flw     fa1, V1_OFF2(sp)
     j       cls_epilogue
@@ -760,12 +782,16 @@ cls_retstruct_d_f:
     li      t0,  FFI_TYPE_STRUCT_DF
     bne     a0,  t0, cls_retstruct_f_d
     fld     fa0, V0_OFF2(sp)
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa1, t5 # initialize register to Nan
     flw     fa1, V1_OFF2(sp)
     j       cls_epilogue
     
 cls_retstruct_f_d:
     li      t0,  FFI_TYPE_STRUCT_FD
     bne     a0,  t0, cls_retstruct_small2
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, V0_OFF2(sp)
     fld     fa1, V1_OFF2(sp)
     j       cls_epilogue

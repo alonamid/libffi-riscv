@@ -538,8 +538,8 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     int type;
     unsigned xarg_reg = 0;
     unsigned farg_reg = 0;
-    unsigned temp_float_flags;
-    unsigned temp_int_flags;
+    unsigned temp_float_flags =0;
+    unsigned temp_int_flags= 0;
     unsigned loc = 0;
     unsigned xcount = (cif->nargs < 8) ? cif->nargs : 8;
     unsigned fcount = (cif->nargs < 8) ? cif->nargs : 8;
@@ -850,12 +850,16 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
 {
     unsigned int *tramp = (unsigned int *) &closure->tramp[0];
     
+    //printf("got here");
     uintptr_t fn = (uintptr_t) ffi_closure_asm;
     FFI_ASSERT(tramp == codeloc);
     
     /* Remove when more than just rv64 is supported */
     if (cif->abi != FFI_RV64_SINGLE || cif->abi != FFI_RV64_DOUBLE)
-        return FFI_BAD_ABI;
+    {
+        //printf("bad abi?");
+        //return FFI_BAD_ABI;
+    }
     
     if (cif->abi == FFI_RV32_SINGLE || cif->abi == FFI_RV32_DOUBLE || cif->abi == FFI_RV32_SOFT_FLOAT || fn < 0x7ffff000U)
     {
@@ -948,7 +952,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     void **avaluep;
     ffi_arg *avalue;
     ffi_type **arg_types;
-    int i, avn, argn;
+    int i, avn, argn, fargn;
     int soft_float;
     ffi_arg *argp;
     size_t z;
@@ -958,7 +962,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     avalue = alloca(cif->nargs * sizeof (ffi_arg));
     avaluep = alloca(cif->nargs * sizeof (ffi_arg));
     argn = 0;
-    argn = 0;
+    fargn = 0;
     
     if (cif->rstruct_flag)
     {
@@ -975,7 +979,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
         z = arg_types[i]->size;
         if (arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE || arg_types[i]->type == FFI_TYPE_LONGDOUBLE)
         {
-            argp = (argn >= 8 || cif->isvariadic || soft_float) ? ar + argn : fpr + argn;
+           argp = (fargn >= 8 || cif->isvariadic || soft_float) ? ar + argn : fpr + fargn;
             if ((arg_types[i]->type == FFI_TYPE_LONGDOUBLE) && ((uintptr_t)argp & (arg_types[i]->alignment-1)))
             {
                 argp = (ffi_arg*)ALIGN(argp, arg_types[i]->alignment);
@@ -1065,7 +1069,14 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     break;
             }
         }
-        argn += ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
+        if ((arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE) && !(fargn >= 8 || cif->isvariadic || soft_float))
+        {
+           fargn++;
+        }
+        else
+        {
+           argn += ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
+        }
         i++;
     }
     
