@@ -96,7 +96,8 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
     {
         size_t z;
         unsigned int a;
-        int num_struct_floats = 0;
+	int num_struct_floats = 0;
+        int num_struct_ints = 0;
 
 
         /* Align if necessary. */
@@ -119,6 +120,10 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                 if (e->type == FFI_TYPE_DOUBLE || e->type == FFI_TYPE_FLOAT)
                 {
                     num_struct_floats++;
+                }
+                else
+                {
+                    num_struct_ints++;
                 }
                 index++;
             }
@@ -286,7 +291,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                 }
             }
 
-            else if (type == FFI_TYPE_STRUCT && (num_struct_floats == 1) && (max_fp_reg_size != 0) && freg<8 && xreg<8)
+            else if (type == FFI_TYPE_STRUCT && (num_struct_floats == 1) && (num_struct_ints == 1) && (max_fp_reg_size != 0) && freg<8 && xreg<8)
             { 
                 ffi_type *e;
                 unsigned index = 0;
@@ -371,7 +376,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                 //unsigned long cap = (unsigned long) stack + bytes;
                 //unsigned long cap = stack + (8 * FFI_SIZEOF_ARG);
                 unsigned long cap = arg_stack_start;
-
                 if (end <= cap) //still storing in register space
                 {
                     memcpy(argp, *p_argv, z);
@@ -1062,7 +1066,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
             if ((uintptr_t)argp & (arg_types[i]->alignment-1))
             {
                 argp = (ffi_arg*)ALIGN(argp, arg_types[i]->alignment);
-                argn++;
+                //argn++;
                 //argn = ALIGN(argn, arg_types[i]->alignment / sizeof(ffi_arg));
             }
             avaluep[i] = alloca(arg_types[i]->size);
@@ -1073,9 +1077,9 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
         {
             unsigned type = arg_types[i]->type;
             
-            if (arg_types[i]->alignment > sizeof(ffi_arg))
+            if (arg_types[i]->alignment > sizeof(ffi_arg) && (arg_types[i]->size <= 2*sizeof(ffi_arg)))
                 argn = ALIGN(argn, arg_types[i]->alignment / sizeof(ffi_arg));
-            
+
             argp = ar + argn;
             
             /* The size of a pointer depends on the ABI */
@@ -1141,7 +1145,8 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                            with pointers in the registers. We need to properly pass the pointer AND set
                            the correct size to increment by! */
                         avaluep[i] = (void *) *argp;
-                        z = 1;
+                        //z = 1;
+                        z = sizeof(ffi_arg);
                         break;
                     }
                     
