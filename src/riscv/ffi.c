@@ -126,6 +126,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
 
         z = (*p_arg)->size;
+        //printf("p_arg type %d,p_arg_size %d, p_argv %x\n", type, z, *p_argv);
         if (z <= sizeof(ffi_arg) && (freg < 8 || xreg <8))
         {
             int type = (*p_arg)->type;
@@ -759,20 +760,16 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
 {
     int i;
     ffi_type **ptr;
-    unsigned bytes = 0, extra_bytes = 0;
+    unsigned bytes = 0, fbytes =0, extra_bytes = 0;
    
     int soft_float = cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT;;
  
     if (cif->rtype->type == FFI_TYPE_STRUCT)
         bytes = STACK_ARG_SIZE(sizeof(void*));
     
-    for (ptr = cif->arg_types, i = cif->nargs; i > 0; i--, ptr++)
+    for (ptr = cif->arg_types, i = 0; i < cif->nargs; i++, ptr++)
     {
-        /* Add any padding if necessary */
-        if (((*ptr)->alignment - 1) & bytes)
-        {
-            bytes = (unsigned)ALIGN(bytes, (*ptr)->alignment);
-        }
+        unsigned type = (cif->arg_types)[i]->type;
         /* When we pass big structs in registers, we copy it onto the stack and assign a pointer to it */
         if ((*ptr)->size > 2 * FFI_SIZEOF_ARG && bytes < 8 * FFI_SIZEOF_ARG)
         {
@@ -781,18 +778,68 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
         }
         else
         {
-            bytes += STACK_ARG_SIZE((*ptr)->size);
+            if (type == FFI_TYPE_FLOAT || type == FFI_TYPE_DOUBLE)
+            {
+                if (((*ptr)->alignment - 1) & fbytes)
+                {
+                   fbytes = (unsigned)ALIGN(fbytes, (*ptr)->alignment);
+                }
+                fbytes += STACK_ARG_SIZE((*ptr)->size);
+            }
+            else if (type == FFI_TYPE_STRUCT) //This struct must have a size of less than 2XLEN
+            {
+                ffi_type *e;
+                unsigned struct_index = 0;
+                unsigned num_struct_floats=0;
+                unsigned num_struct_ints=0;
+                while ((e = (cif->arg_types)[i]->elements[struct_index]))
+                {
+                    if (e->type == FFI_TYPE_DOUBLE || e->type == FFI_TYPE_FLOAT)
+                    {
+                        if ((e->alignment - 1) & fbytes)
+                        {
+                            fbytes = (unsigned)ALIGN(fbytes, e->alignment);
+                        }
+                        fbytes += STACK_ARG_SIZE(e->size);
+                    }
+                    else
+                    {
+                        /* Add any padding if necessary */
+                        if ((e->alignment - 1) & bytes)
+                        {
+                            bytes = (unsigned)ALIGN(bytes, e->alignment);
+                        }
+                        bytes += STACK_ARG_SIZE(e->size);
+                    }
+                    struct_index++;
+                }
+            }
+            else
+            {
+                if (((*ptr)->alignment - 1) & bytes)
+                {
+                   bytes = (unsigned)ALIGN(bytes, (*ptr)->alignment);
+                }
+                bytes += STACK_ARG_SIZE((*ptr)->size);
+            }
         }
     }
 
-    if (!soft_float && bytes < 16 * FFI_SIZEOF_ARG)
-        bytes = 16 * FFI_SIZEOF_ARG;
-    else if (bytes < 8 * FFI_SIZEOF_ARG)
+    //printf("fbytes: %d, bytes: %d, extra_bytes: %d\n", fbytes, bytes, extra_bytes);
+
+    if (!soft_float)
+    {
+        if (fbytes < 8 * FFI_SIZEOF_ARG)
+        {
+            fbytes = 8 * FFI_SIZEOF_ARG;
+        }
+    }
+    if (bytes < 8 * FFI_SIZEOF_ARG)
         bytes = 8 * FFI_SIZEOF_ARG;
    
+    bytes += fbytes;
+    bytes += extra_bytes;   
  
-    bytes += extra_bytes;
-    
     cif->bytes = bytes;
     //printf("final bytes is %d\n", bytes);
 }
@@ -866,7 +913,7 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
     if (cif->abi != FFI_RV64_SINGLE || cif->abi != FFI_RV64_DOUBLE)
     {
         //printf("bad abi?");
-        //return FFI_BAD_ABI;
+       // return FFI_BAD_ABI;
     }
     
     if (cif->abi == FFI_RV32_SINGLE || cif->abi == FFI_RV32_DOUBLE || cif->abi == FFI_RV32_SOFT_FLOAT || fn < 0x7ffff000U)
@@ -972,6 +1019,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     argn = 0;
     fargn = 0;
     
+    //printf("ar %x, fpr %x\n", ar[0], fpr[0]);
     if (cif->rstruct_flag)
     {
         rvalue = (void *)ar[0];
@@ -985,16 +1033,42 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     while (i < avn)
     {
         z = arg_types[i]->size;
-        if (arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE || arg_types[i]->type == FFI_TYPE_LONGDOUBLE)
+        //the argument is a float/doubel/ Handling depends wether its variadic, what is the number of argsm and is there a soft float
+        if (arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE)
         {
-           argp = (fargn >= 8 || cif->isvariadic || soft_float) ? ar + argn : fpr + fargn;
-            if ((arg_types[i]->type == FFI_TYPE_LONGDOUBLE) && ((uintptr_t)argp & (arg_types[i]->alignment-1)))
+           //printf("fpr %x, fargn %x\n", fpr[0], fargn);
+           argp = (fargn >= 8 || (cif->isvariadic && (i > cif->nfixedargs)) || soft_float) ? ar + argn : fpr + fargn;
+           //avaluep[i] = (char *) argp;
+           //printf("argp %x\n", argp[0]);
+           //printf("argp %f\n", (char)*argp);
+           switch (arg_types[i]->type)
+           {
+                case FFI_TYPE_FLOAT:
+                    avaluep[i] = &avalue[i];
+                    avalue[i] = (char*) *argp;
+                    break;
+                    
+                case FFI_TYPE_DOUBLE:
+                    avaluep[i] = &avalue[i];
+                    avalue[i] = (char*) *argp;
+                    break;
+           }
+           //printf("avalue %x\n", avalue[i]);
+        }
+        //long doubles are handled according to the integer convention
+        else if (arg_types[i]->type == FFI_TYPE_LONGDOUBLE)
+        {
+            argp = ar + argn;
+            if ((uintptr_t)argp & (arg_types[i]->alignment-1))
             {
                 argp = (ffi_arg*)ALIGN(argp, arg_types[i]->alignment);
                 argn++;
+                //argn = ALIGN(argn, arg_types[i]->alignment / sizeof(ffi_arg));
             }
-            avaluep[i] = (char *) argp;
+            avaluep[i] = alloca(arg_types[i]->size);
+            memcpy(avaluep[i], argp, arg_types[i]->size);
         }
+        //handle according to struct or integer convetions
         else
         {
             unsigned type = arg_types[i]->type;
@@ -1008,8 +1082,8 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
             if (type == FFI_TYPE_POINTER)
                 type = (cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV64_DOUBLE || cif->abi == FFI_RV64_SOFT_FLOAT) ? FFI_TYPE_SINT64 : FFI_TYPE_SINT32;
 
-            if (soft_float && type == FFI_TYPE_FLOAT)
-                type = FFI_TYPE_UINT32;
+            //if (soft_float && type == FFI_TYPE_FLOAT)
+            //    type = FFI_TYPE_UINT32;
             
             switch (type)
             {
@@ -1077,7 +1151,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     break;
             }
         }
-        if ((arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE) && !(fargn >= 8 || cif->isvariadic || soft_float))
+        if ((arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE) && !(fargn >= 8 || (cif->isvariadic && (i>cif->nfixedargs) ) || soft_float))
         {
            fargn++;
         }
