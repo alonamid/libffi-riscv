@@ -78,6 +78,8 @@ static void struct_args_to_regs(ffi_type * p_arg, char** argp, char** fargp, voi
             }
         }
 
+        *p_argv = (unsigned)ALIGN(*p_argv, e->alignment);
+
         switch (e->type)
         {
             case FFI_TYPE_FLOAT:
@@ -303,7 +305,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                     break;
                 /* Handle structures. */
                 default:
-                    if (num_struct_floats==1)
+                    if (type == FFI_TYPE_STRUCT && num_struct_floats==1)
                     {
                         //memcpy(argp, *p_argv, (*p_arg)->size);
                         struct_args_to_regs(*p_arg, &argp, &fargp, p_argv, &xreg, &freg, &a);
@@ -377,7 +379,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
         }
         else if (z <= 2*sizeof(ffi_arg) && (freg < 8 || xreg <8))
         {
-            if (type == FFI_TYPE_STRUCT && (num_struct_floats == 2) && (max_fp_reg_size != 0) && freg<7)
+            if (type == FFI_TYPE_STRUCT && (num_struct_floats == 2) && (num_struct_ints==0) && (max_fp_reg_size != 0) && freg<7)
             {   
                struct_args_to_regs(*p_arg, &argp, &fargp, p_argv, &xreg, &freg, &a);
             }
@@ -430,7 +432,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                But, we can't _just_ copy it onto the stack! We need to actually
                make sure it gets onto the "bottom" (really the top, high memory
                addresses) of the stack frame... */
-            
             /* Update pointer to where our struct location on the stack is */
             cpy_struct -= ALIGN(z, a);
             
@@ -530,52 +531,85 @@ static void riscv_struct_flags(unsigned int* farg_reg, unsigned int* xarg_reg, u
 
 
 
-/* This code traverses structure definitions 
-   and generates the appropriate flags. */
 
-static unsigned calc_riscv_struct_flags(int max_fp_reg_size, ffi_type *arg, size_t size, unsigned *loc, unsigned *arg_reg)
+static unsigned riscv_return_struct_flags_rec(ffi_type *arg, unsigned flags)
 {
-    unsigned flags = 0;
-    unsigned index = 0;
+    //unsigned flags = 0;
+    unsigned int index = 0;
     ffi_type *e;
     
-    if (max_fp_reg_size)
-        return 0;
-    
-    /* The struct is too big to pass on the stack, so we pass it by reference */
-    if (size > 2 * FFI_SIZEOF_ARG)
+
+    while (e = arg->elements[index])
     {
-        (*arg_reg)++;
-        return 0;
-    }
-    
-    while ((e = arg->elements[index]))
-    {
-        /* Align this object. */
-        *loc = ALIGN(*loc, e->alignment);
-        
         if (e->type == FFI_TYPE_DOUBLE)
-        {
-            /* Already aligned to FFI_SIZEOF_ARG. */
-            *arg_reg = *loc / FFI_SIZEOF_ARG;
-            
-            if (*arg_reg > 7)
-                break;
-            
-            flags += (FFI_TYPE_DOUBLE << (*arg_reg * FFI_FLAG_BITS));
-            *loc += e->size;
-        }
+            flags += FFI_TYPE_DOUBLE << (index*FFI_FLAG_BITS);
+        else if (e->type == FFI_TYPE_FLOAT)
+            flags += FFI_TYPE_FLOAT << (index*FFI_FLAG_BITS);
+        else if (e->type == FFI_TYPE_STRUCT)
+            flags += riscv_return_struct_flags_rec(e, flags) << (index*FFI_FLAG_BITS);
         else
-            *loc += e->size;
-        
+            flags += FFI_TYPE_INT << (index*FFI_FLAG_BITS);
         index++;
     }
+    return flags;
+}
+
+
+//on the first iteration, remaining bytes = arg->size
+//it is later subtracted for nested structs
+static unsigned riscv_return_struct_flags(int max_fp_reg_size, ffi_type *arg)
+{
+    unsigned flags = 0;
+    unsigned small = FFI_TYPE_SMALLSTRUCT;
     
-    /* Next Argument register at alignment of FFI_SIZEOF_ARG. */
-    *arg_reg = ALIGN(*loc, FFI_SIZEOF_ARG) / FFI_SIZEOF_ARG;
+    /* Returning structures under n32 is a tricky thing.
+       A struct with only one or two floating point fields
+       is returned in $f0 (and $f2 if necessary). Any other
+       struct results at most 128 bits are returned in $2
+       (the first 64 bits) and $3 (remainder, if necessary).
+       Larger structs are handled normally. */
+    
+    if (arg->size > 2 * FFI_SIZEOF_ARG)
+        return 0;
+    
+    if (arg->size > FFI_SIZEOF_ARG)
+        small = FFI_TYPE_SMALLSTRUCT2;
+   
+
+    unsigned int num_struct_floats =0;
+    unsigned int num_struct_ints =0; 
+    struct_float_counter(&num_struct_floats, &num_struct_ints, arg, max_fp_reg_size);
+    //printf("num_struct_floats %d, num_struct_ints %d\n", num_struct_floats, num_struct_ints); 
+    if ((num_struct_floats==1) && (num_struct_ints ==0) && (max_fp_reg_size !=0))
+    {
+        flags = riscv_return_struct_flags_rec(arg, flags);
+    }
+    else if (num_struct_floats == 2 && (num_struct_ints==0) && (max_fp_reg_size != 0))
+    {   
+        flags = riscv_return_struct_flags_rec(arg, flags);
+    }
+    else if ((num_struct_floats == 1) && (num_struct_ints == 1) && (max_fp_reg_size != 0))
+    {    
+        flags = riscv_return_struct_flags_rec(arg, flags);
+    }
+    else //if (flags && (num_struct_floats > 2 || num_struct_ints > 2))
+    {
+        /* There are three arguments and the first two are
+               floats! This must be passed the old way. */
+        return small;
+    }
+        
+    if (max_fp_reg_size ==0)
+        flags += FFI_TYPE_STRUCT_SOFT;
+    
+    if (!flags)
+        return small;
     
     return flags;
 }
+
+
+
 
 /* The flags output of this routine should match the various struct cases
    described in ffitarget.h */
@@ -596,7 +630,7 @@ static unsigned calc_riscv_return_struct_flags(int soft_float, ffi_type *arg)
     if (arg->size > 2 * FFI_SIZEOF_ARG)
         return 0;
     
-    if (arg->size > 8)
+    if (arg->size > FFI_SIZEOF_ARG)
         small = FFI_TYPE_SMALLSTRUCT2;
     
     e = arg->elements[0];
@@ -612,7 +646,8 @@ static unsigned calc_riscv_return_struct_flags(int soft_float, ffi_type *arg)
         else if (e->type == FFI_TYPE_FLOAT)
             flags += FFI_TYPE_FLOAT << FFI_FLAG_BITS;
         else
-            return small;
+            flags += FFI_TYPE_INT << FFI_FLAG_BITS;
+            //return small;
         
         if (flags && (arg->elements[2]))
         {
@@ -656,7 +691,8 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     
     if (cif->rtype->type == FFI_TYPE_STRUCT)
     {
-        struct_flags = calc_riscv_return_struct_flags(soft_float, cif->rtype);
+        //struct_flags = calc_riscv_return_struct_flags(soft_float, cif->rtype);
+        struct_flags = riscv_return_struct_flags(max_fp_reg_size, cif->rtype);
         if (struct_flags == 0)
         {
             /* This means that the structure is being passed as
@@ -992,38 +1028,114 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
     return FFI_OK;
 }
 
-static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *type, int argn, unsigned arg_offset, ffi_arg *ar, ffi_arg *fpr, int soft_float)
+static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *type, int* argn, int* fargn, unsigned arg_offset, ffi_arg *ar, ffi_arg *fpr, int max_fp_reg_size)
 {
     ffi_type **elt_typep = type->elements;
-    
-    while(*elt_typep)
+    int fargn_org = *fargn;
+    int argn_org = *argn;
+    unsigned o;
+    char *tp;
+    char *argp;
+    char *fpp;
+    unsigned int ret_argn = 0; 
+    unsigned int num_struct_floats=0;
+    unsigned int num_struct_ints=0;        
+    struct_float_counter(&num_struct_floats, &num_struct_ints, type, max_fp_reg_size);
+    if ((num_struct_floats ==2 && num_struct_ints==0 && *fargn < 7) ||
+            (num_struct_floats ==1 && num_struct_ints==1 && *argn<8 && *fargn<8) ||
+            (num_struct_floats ==1 && num_struct_ints==0 && *fargn<8))
     {
-        ffi_type *elt_type = *elt_typep;
-        unsigned o;
-        char *tp;
-        char *argp;
-        char *fpp;
-        
-        o = ALIGN(offset, elt_type->alignment);
-        arg_offset += o - offset;
-        offset = o;
-        argn += arg_offset / sizeof(ffi_arg);
-        arg_offset = arg_offset % sizeof(ffi_arg);
-        argp = (char *)(ar + argn);
-        fpp = (char *)(argn >= 8 ? ar + argn : fpr + argn);
-        tp = target + offset;
-        
-        if (elt_type->type == FFI_TYPE_DOUBLE && !soft_float)
-            *(double *)tp = *(double *)fpp;
-        else
-            memcpy(tp, argp + arg_offset, elt_type->size);
-        
-        offset += elt_type->size;
-        arg_offset += elt_type->size;
-        elt_typep++;
-        argn += arg_offset / sizeof(ffi_arg);
-        arg_offset = arg_offset % sizeof(ffi_arg);
+        while(*elt_typep)
+        {
+            ffi_type *elt_type = *elt_typep;
+            o = ALIGN(offset, elt_type->alignment);
+            arg_offset += o - offset;
+            //printf("a: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+            offset = o;
+            //printf("b: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+            tp = target + offset;
+            fpp = (char *) fpr + *fargn;
+            argp = (char *)(ar + *argn);
+            //printf("c: o %d, arg_offset %d, argn %d, fargn %d, argp %x, fpp %x, tp %x \n", o, arg_offset, *argn, *fargn, argp, fpp, tp);
+            if (elt_type->type == FFI_TYPE_FLOAT && (max_fp_reg_size != 0))
+            {
+                *(float *)tp = *(float *)fpp;
+                *fargn++;
+                offset += elt_type->size;
+            }
+            else if (elt_type->type == FFI_TYPE_DOUBLE && (max_fp_reg_size !=0))
+            {
+                 *(double *)tp = *(double *)fpp;
+                 *fargn++;
+                offset += elt_type->size;
+            }  
+            else if (elt_type->type == FFI_TYPE_STRUCT && (max_fp_reg_size !=0))
+            {
+                 copy_struct(tp, offset, abi, elt_type, argn, fargn, arg_offset, ar, fpr, max_fp_reg_size);
+            }
+            else
+            {
+                memcpy(tp, argp + arg_offset, elt_type->size);
+                //printf("c: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+                offset += elt_type->size;
+                arg_offset += elt_type->size;
+                //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+                *argn += arg_offset / sizeof(ffi_arg);
+                //ret_argn += elt_type->size;
+                arg_offset = arg_offset % sizeof(ffi_arg);
+                //printf("e: o %d, arg_offset %d, argn %d, argp %x ret_argn %d\n", o, arg_offset, argn, argp, ret_argn);
+            }
+            elt_typep++;
+        }
+        *argn = arg_offset > 0 ? (*argn)+1 : *argn;
+        //printf("f: o %d, arg_offset %d, argn %d, fargn %d, argp %x, fpp %x, tp %x \n", o, arg_offset, *argn, *fargn, argp, fpp, tp);
+        //printf("f: o %d, arg_offset %d, argn %d, fargn %d, argp %x \n", o, arg_offset, *argn, *fargn, argp);
     }
+    else
+    {
+        while(*elt_typep)
+        {
+            ffi_type *elt_type = *elt_typep;
+            o = ALIGN(offset, elt_type->alignment);
+            arg_offset += o - offset;
+            //printf("a: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+            offset = o;
+            //printf("b: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+            tp = target + offset;
+            *argn += arg_offset / sizeof(ffi_arg);
+            arg_offset = arg_offset % sizeof(ffi_arg);
+            argp = (char *)(ar + *argn);
+
+            if (elt_type->type == FFI_TYPE_STRUCT)
+            {
+                 copy_struct(tp, offset, abi, elt_type, argn, fargn, arg_offset, ar, fpr, max_fp_reg_size);
+                 //offset += struct_res;
+                 offset += elt_type->size;
+                 //arg_offset += struct_res;;
+                 //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+            }
+            else
+            {
+                memcpy(tp, argp + arg_offset, elt_type->size);
+                //printf("c: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+                offset += elt_type->size;
+                arg_offset += elt_type->size;
+                //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
+                *argn += arg_offset / sizeof(ffi_arg);
+                //ret_argn += elt_type->size;
+                arg_offset = arg_offset % sizeof(ffi_arg);
+                //printf("e: o %d, arg_offset %d, argn %d, argp %x \n", o, arg_offset, *argn, argp);
+            }
+            elt_typep++;
+        }
+        *argn = arg_offset > 0 ? (*argn)+1 : *argn;
+        //printf("f: o %d, arg_offset %d, argn %d, argp %x \n", o, arg_offset, *argn, argp);
+    }
+    //printf("return val: %d\n", ret_argn - sizeof(ffi_arg)*argn_org);
+    //printf("return val: %d\n", ((ret_argn + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)));
+    //return ((ret_argn + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)) + argn_org;
+    //printf("return val: %d\n", (argn + (arg_offset + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)));
+    //return argn + (arg_offset + (sizeof(ffi_arg)-1))/sizeof(ffi_arg);
 }
 
 /*
@@ -1049,11 +1161,14 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     ffi_type **arg_types;
     int i, avn, argn, fargn;
     int soft_float;
+    int argn_struct;
     ffi_arg *argp;
     size_t z;
     
     cif = closure->cif;
     soft_float = cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT;
+    unsigned int max_fp_reg_size = (cif->abi == FFI_RV64_DOUBLE || cif->abi == FFI_RV32_DOUBLE) ? 64 : 
+                             ((cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT) ? 0 : 32); //this can be expanded to 128 for QUAD if needed
     avalue = alloca(cif->nargs * sizeof (ffi_arg));
     avaluep = alloca(cif->nargs * sizeof (ffi_arg));
     argn = 0;
@@ -1073,12 +1188,13 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     while (i < avn)
     {
         z = arg_types[i]->size;
+        //printf("size is %d\n", z);
         //the argument is a float/doubel/ Handling depends wether its variadic, what is the number of argsm and is there a soft float
         if (arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE)
         {
            //printf("fpr %x, fargn %x\n", fpr[0], fargn);
            argp = (fargn >= 8 || (cif->isvariadic && (i > cif->nfixedargs)) || soft_float) ? ar + argn : fpr + fargn;
-           //avaluep[i] = (char *) argp;
+           //avaluep[i] = (char *) argp2;
            //printf("argp %x\n", argp[0]);
            //printf("argp %f\n", (char)*argp);
            switch (arg_types[i]->type)
@@ -1172,7 +1288,8 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     {
                         /* Allocate space to copy structs that were passed in registers */
                         avaluep[i] = alloca(arg_types[i]->size);
-                        copy_struct(avaluep[i], 0, cif->abi, arg_types[i], argn, 0, ar, fpr, soft_float);
+                        argn_struct = argn;
+                        copy_struct(avaluep[i], 0, cif->abi, arg_types[i], &argn_struct, &fargn, 0, ar, fpr, max_fp_reg_size);
                         break;
                     }
                     else
@@ -1183,6 +1300,7 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                         avaluep[i] = (void *) *argp;
                         //z = 1;
                         z = sizeof(ffi_arg);
+                        argn_struct = argn + ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
                         break;
                     }
                     
@@ -1196,9 +1314,14 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
         {
            fargn++;
         }
+        else if (arg_types[i]->type == FFI_TYPE_STRUCT) 
+        {
+            argn = argn_struct;
+        }
         else
         {
            argn += ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
+           //printf("z %d. size of ffi_arg %d, argn %d\n", z, sizeof(ffi_arg), argn);
         }
         i++;
     }
