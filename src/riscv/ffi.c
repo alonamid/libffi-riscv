@@ -1054,19 +1054,19 @@ static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *ty
             offset = o;
             //printf("b: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             tp = target + offset;
-            fpp = (char *) fpr + *fargn;
+            fpp = (char *) (fpr + *fargn);
             argp = (char *)(ar + *argn);
             //printf("c: o %d, arg_offset %d, argn %d, fargn %d, argp %x, fpp %x, tp %x \n", o, arg_offset, *argn, *fargn, argp, fpp, tp);
             if (elt_type->type == FFI_TYPE_FLOAT && (max_fp_reg_size != 0))
             {
                 *(float *)tp = *(float *)fpp;
-                *fargn++;
+                (*fargn)++;
                 offset += elt_type->size;
             }
             else if (elt_type->type == FFI_TYPE_DOUBLE && (max_fp_reg_size !=0))
             {
                  *(double *)tp = *(double *)fpp;
-                 *fargn++;
+                 (*fargn)++;
                 offset += elt_type->size;
             }  
             else if (elt_type->type == FFI_TYPE_STRUCT && (max_fp_reg_size !=0))
