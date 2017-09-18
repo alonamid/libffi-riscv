@@ -166,15 +166,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
     char *argp, *fargp, *cpy_struct, *arg_stack_start;
     ffi_type **p_arg;   
 
-    //printf("FFI_RV64_SINGLE=%d\n", FFI_RV64_SINGLE);
-    //printf("FFI_RV64_SOFT_FLOAT=%d\n", FFI_RV64_SOFT_FLOAT);
-    //printf("FFI_RV64_DOUBLE=%d\n", FFI_RV64_DOUBLE);
-    //printf("FFI_DEFAULT_ABI=%d\n", FFI_DEFAULT_ABI);
-    //printf("ecif->cif->abi=%d\n", ecif->cif->abi);
-    //printf("__riscv_xlen=%d\n", __riscv_xlen);
-    //printf("__riscv_flen=%d\n", __riscv_flen);
-    //printf("bytes is %d\n", bytes);
-
     ffi_cif* wcif = ecif->cif; //working cif
     char isvariadic = wcif->isvariadic;
     int nfixedargs = wcif->nfixedargs;
@@ -201,10 +192,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
     memset(stack, 0, bytes);
 
-   // printf("ecif address %x\n", ecif);
-    //return value is a hidden argument
-   // printf("marker 1\n");
-   // printf("marker 4\n");
     if (wcif->rstruct_flag != 0)
     {
         *(ffi_arg *) argp = (ffi_arg) ecif->rvalue;
@@ -227,9 +214,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
         if (a < sizeof(ffi_arg))
             a = sizeof(ffi_arg);
 
-        // printf("xreg = %d, freg = %d\n", xreg, freg);
-        //printf("argument details: type: %d, size: %d, alignment: %d\n", (*p_arg)->type, (*p_arg)->size, (*p_arg)->alignment);
-        //printf("argument details: argp: %x, fargp: %x\n", argp, fargp);
         int type = (*p_arg)->type;
 
 
@@ -240,7 +224,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
 
 
         z = (*p_arg)->size;
-        //printf("p_arg type %d,p_arg_size %d, p_argv %x\n", type, z, *p_argv);
         if (z <= sizeof(ffi_arg) && (freg < 8 || xreg <8))
         { 
             int type = (*p_arg)->type;
@@ -307,7 +290,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                 default:
                     if (type == FFI_TYPE_STRUCT && num_struct_floats==1)
                     {
-                        //memcpy(argp, *p_argv, (*p_arg)->size);
                         struct_args_to_regs(*p_arg, &argp, &fargp, p_argv, &xreg, &freg, &a);
                     }
                     else if (type == FFI_TYPE_STRUCT && (num_struct_floats == 2) && (max_fp_reg_size != 0) && freg<7)
@@ -398,8 +380,6 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
                 /* Check if the data will fit within the register space.
                    Handle it if it doesn't. */
                 unsigned long end = (unsigned long) argp + z;
-                //unsigned long cap = (unsigned long) stack + bytes;
-                //unsigned long cap = stack + (8 * FFI_SIZEOF_ARG);
                 unsigned long cap = arg_stack_start;
                 if (end <= cap) //still storing in register space
                 {
@@ -540,7 +520,6 @@ static void riscv_struct_flags(unsigned int* farg_reg, unsigned int* xarg_reg, u
 
 static unsigned riscv_return_struct_flags_rec(ffi_type *arg, unsigned flags)
 {
-    //unsigned flags = 0;
     unsigned int index = 0;
     ffi_type *e;
     
@@ -585,7 +564,6 @@ static unsigned riscv_return_struct_flags(int max_fp_reg_size, ffi_type *arg)
     unsigned int num_struct_floats =0;
     unsigned int num_struct_ints =0; 
     struct_float_counter(&num_struct_floats, &num_struct_ints, arg, max_fp_reg_size);
-    //printf("num_struct_floats %d, num_struct_ints %d\n", num_struct_floats, num_struct_ints); 
     if ((num_struct_floats==1) && (num_struct_ints ==0) && (max_fp_reg_size !=0))
     {
         flags = riscv_return_struct_flags_rec(arg, flags);
@@ -616,61 +594,6 @@ static unsigned riscv_return_struct_flags(int max_fp_reg_size, ffi_type *arg)
 
 
 
-
-/* The flags output of this routine should match the various struct cases
-   described in ffitarget.h */
-
-static unsigned calc_riscv_return_struct_flags(int soft_float, ffi_type *arg)
-{
-    unsigned flags = 0;
-    unsigned small = FFI_TYPE_SMALLSTRUCT;
-    ffi_type *e;
-    
-    /* Returning structures under n32 is a tricky thing.
-       A struct with only one or two floating point fields
-       is returned in $f0 (and $f2 if necessary). Any other
-       struct results at most 128 bits are returned in $2
-       (the first 64 bits) and $3 (remainder, if necessary).
-       Larger structs are handled normally. */
-    
-    if (arg->size > 2 * FFI_SIZEOF_ARG)
-        return 0;
-    
-    if (arg->size > FFI_SIZEOF_ARG)
-        small = FFI_TYPE_SMALLSTRUCT2;
-    
-    e = arg->elements[0];
-    if (e->type == FFI_TYPE_DOUBLE)
-        flags = FFI_TYPE_DOUBLE;
-    else if (e->type == FFI_TYPE_FLOAT)
-        flags = FFI_TYPE_FLOAT;
-    
-    if (flags && (e = arg->elements[1]))
-    {
-        if (e->type == FFI_TYPE_DOUBLE)
-            flags += FFI_TYPE_DOUBLE << FFI_FLAG_BITS;
-        else if (e->type == FFI_TYPE_FLOAT)
-            flags += FFI_TYPE_FLOAT << FFI_FLAG_BITS;
-        else
-            flags += FFI_TYPE_INT << FFI_FLAG_BITS;
-            //return small;
-        
-        if (flags && (arg->elements[2]))
-        {
-            /* There are three arguments and the first two are
-               floats! This must be passed the old way. */
-            return small;
-        }
-        
-        if (soft_float)
-            flags += FFI_TYPE_STRUCT_SOFT;
-    }
-    else if (!flags)
-        return small;
-    
-    return flags;
-}
-
 /* Generate the flags word for processing arguments and 
    putting them into their proper registers in the 
    assembly routine. */
@@ -682,14 +605,9 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     unsigned farg_reg = 0;
     unsigned temp_float_flags =0;
     unsigned temp_int_flags= 0;
-    unsigned loc = 0;
-    unsigned xcount = (cif->nargs < 8) ? cif->nargs : 8;
-    unsigned fcount = (cif->nargs < 8) ? cif->nargs : 8;
     unsigned index = 0;
     
     unsigned int struct_flags = 0;
-    int soft_float = cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT;;
-    int soft_double = cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV32_SINGLE;;
     unsigned int max_fp_reg_size = (cif->abi == FFI_RV64_DOUBLE || cif->abi == FFI_RV32_DOUBLE) ? 64 : 
                              ((cif->abi == FFI_RV64_SOFT_FLOAT || cif->abi == FFI_RV32_SOFT_FLOAT) ? 0 : 32); //this can be expanded to 128 for QUAD if needed
  
@@ -697,14 +615,12 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     
     if (cif->rtype->type == FFI_TYPE_STRUCT)
     {
-        //struct_flags = calc_riscv_return_struct_flags(soft_float, cif->rtype);
         struct_flags = riscv_return_struct_flags(max_fp_reg_size, cif->rtype);
         if (struct_flags == 0)
         {
             /* This means that the structure is being passed as
                a hidden argument */
             xarg_reg = 1;
-            //count = (cif->nargs < 7) ? cif->nargs : 7;
             cif->rstruct_flag = !0;
         }
         else
@@ -720,19 +636,21 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
      * We only describe the two argument types we care about:
      * - Whether or not its a float/double
      * - Whether or not its a struct
-     * 
-     * This is is two bits per argument accounting for the first 16 bits
-     * of cif->flags.
+     *
+     * For the function arguments, each of the first 16 bits of cif->flags represents 1 argument
+     * The first 8 bits represent the 8 floating point registers.
+     * a '0' means the argument is a float, while a '1' means the argument is a double.
+     * The next 8 bits represent the 8 integer register. They are currently all 0, but have
+     * potential for differentiation 
      * 
      * The last 16 bits are just used to describe the return type
+     * The return type uses complex 2-bit flags, which are described in ffitarget.h
      * 
      * FFI_FLAG_BITS = 2
      */
-    //printf("xarg_reg %x, farg_reg %x, index %x, cif->nargs %x\n", xarg_reg, farg_reg, index, cif->nargs);
     while ((xarg_reg<8 || farg_reg<8) && index < cif->nargs)
     {
         type = (cif->arg_types)[index]->type;
-        //printf("xarg_reg = %d, farg_reg = %d, index = %d, nargs = %d, type=%d\n", xarg_reg, farg_reg, index, cif->nargs, type);
         switch (type)
         {
             case FFI_TYPE_FLOAT:  /* float_flag = 0 */
@@ -786,7 +704,6 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
                 {
                     unsigned num_struct_floats=0;
                     unsigned num_struct_ints=0;
-                    unsigned struct_index = 0;
 
                     struct_float_counter(&num_struct_floats, &num_struct_ints, cif->arg_types[index], max_fp_reg_size);
                     if (num_struct_floats == 2 && num_struct_ints ==0 && farg_reg < 7)
@@ -810,7 +727,6 @@ void ffi_prep_cif_machdep_flags(ffi_cif *cif, unsigned int isvariadic, unsigned 
     cif->flags += temp_int_flags << 8 ; 
     cif->flags += temp_float_flags;
 
-    //printf("before setting return type cif->flags=%x\n",cif->flags);
     /* Set the return type flag */
     
     type = cif->rtype->type;
@@ -892,8 +808,6 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
             }
             else if (type == FFI_TYPE_STRUCT) //This struct must have a size of less than 2XLEN
             {
-                unsigned num_struct_floats=0;
-                unsigned num_struct_ints=0;
                 riscv_struct_bytes(&fbytes, &bytes, cif->arg_types[i]);
             }
             else
@@ -907,7 +821,6 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
         }
     }
 
-    //printf("fbytes: %d, bytes: %d, extra_bytes: %d\n", fbytes, bytes, extra_bytes);
 
     if (!soft_float)
     {
@@ -923,7 +836,6 @@ void ffi_prep_cif_machdep_bytes(ffi_cif *cif)
     bytes += extra_bytes;   
  
     cif->bytes = bytes;
-    //printf("final bytes is %d\n", bytes);
 }
 
 /* Perform machine dependent cif processing */
@@ -933,7 +845,6 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
     ffi_prep_cif_machdep_bytes(cif);
     ffi_prep_cif_machdep_flags(cif, 0, 0);
     cif->isvariadic = 0;
-    //printf("cif flags is %x\n", cif->flags);
     return FFI_OK;
 }
 
@@ -958,8 +869,6 @@ void ffi_call(ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue)
 {
     extended_cif ecif;
 
-    //printf("cif rsturct = %d\n", cif->rstruct_flag);
-
     ecif.cif = cif;
     ecif.avalue = avalue;
 
@@ -970,11 +879,6 @@ void ffi_call(ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue)
         ecif.rvalue = alloca(cif->rtype->size);
     else
         ecif.rvalue = rvalue;
-   
-    //printf("bytes before ffi_call_asm %d\n", cif->bytes);
-    //printf("cif rsturct = %d\n", ecif.cif->rstruct_flag);
-    //printf("ecif original address %x\n", &ecif);
-    //printf("cif original address %x\n", cif);
  
     ffi_call_asm(ffi_prep_args, &ecif, cif->bytes, cif->flags, ecif.rvalue, fn);
 }
@@ -1037,13 +941,10 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
 static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *type, int* argn, int* fargn, unsigned arg_offset, ffi_arg *ar, ffi_arg *fpr, int max_fp_reg_size)
 {
     ffi_type **elt_typep = type->elements;
-    int fargn_org = *fargn;
-    int argn_org = *argn;
     unsigned o;
     char *tp;
     char *argp;
     char *fpp;
-    unsigned int ret_argn = 0; 
     unsigned int num_struct_floats=0;
     unsigned int num_struct_ints=0;        
     struct_float_counter(&num_struct_floats, &num_struct_ints, type, max_fp_reg_size);
@@ -1056,13 +957,10 @@ static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *ty
             ffi_type *elt_type = *elt_typep;
             o = ALIGN(offset, elt_type->alignment);
             arg_offset += o - offset;
-            //printf("a: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             offset = o;
-            //printf("b: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             tp = target + offset;
             fpp = (char *) (fpr + *fargn);
             argp = (char *)(ar + *argn);
-            //printf("c: o %d, arg_offset %d, argn %d, fargn %d, argp %x, fpp %x, tp %x \n", o, arg_offset, *argn, *fargn, argp, fpp, tp);
             if (elt_type->type == FFI_TYPE_FLOAT && (max_fp_reg_size != 0))
             {
                 *(float *)tp = *(float *)fpp;
@@ -1082,20 +980,14 @@ static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *ty
             else
             {
                 memcpy(tp, argp + arg_offset, elt_type->size);
-                //printf("c: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
                 offset += elt_type->size;
                 arg_offset += elt_type->size;
-                //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
                 *argn += arg_offset / sizeof(ffi_arg);
-                //ret_argn += elt_type->size;
                 arg_offset = arg_offset % sizeof(ffi_arg);
-                //printf("e: o %d, arg_offset %d, argn %d, argp %x ret_argn %d\n", o, arg_offset, argn, argp, ret_argn);
             }
             elt_typep++;
         }
         *argn = arg_offset > 0 ? (*argn)+1 : *argn;
-        //printf("f: o %d, arg_offset %d, argn %d, fargn %d, argp %x, fpp %x, tp %x \n", o, arg_offset, *argn, *fargn, argp, fpp, tp);
-        //printf("f: o %d, arg_offset %d, argn %d, fargn %d, argp %x \n", o, arg_offset, *argn, *fargn, argp);
     }
     else
     {
@@ -1104,9 +996,7 @@ static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *ty
             ffi_type *elt_type = *elt_typep;
             o = ALIGN(offset, elt_type->alignment);
             arg_offset += o - offset;
-            //printf("a: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             offset = o;
-            //printf("b: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             tp = target + offset;
             *argn += arg_offset / sizeof(ffi_arg);
             arg_offset = arg_offset % sizeof(ffi_arg);
@@ -1115,50 +1005,21 @@ static void copy_struct(char *target, unsigned offset, ffi_abi abi, ffi_type *ty
             if (elt_type->type == FFI_TYPE_STRUCT)
             {
                  copy_struct(tp, offset, abi, elt_type, argn, fargn, arg_offset, ar, fpr, max_fp_reg_size);
-                 //offset += struct_res;
                  offset += elt_type->size;
-                 //arg_offset += struct_res;;
-                 //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
             }
             else
             {
                 memcpy(tp, argp + arg_offset, elt_type->size);
-                //printf("c: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
                 offset += elt_type->size;
                 arg_offset += elt_type->size;
-                //printf("d: o %d, arg_offset %d, argn %d, argp %x\n", o, arg_offset, argn, argp);
                 *argn += arg_offset / sizeof(ffi_arg);
-                //ret_argn += elt_type->size;
                 arg_offset = arg_offset % sizeof(ffi_arg);
-                //printf("e: o %d, arg_offset %d, argn %d, argp %x \n", o, arg_offset, *argn, argp);
             }
             elt_typep++;
         }
         *argn = arg_offset > 0 ? (*argn)+1 : *argn;
-        //printf("f: o %d, arg_offset %d, argn %d, argp %x \n", o, arg_offset, *argn, argp);
     }
-    //printf("return val: %d\n", ret_argn - sizeof(ffi_arg)*argn_org);
-    //printf("return val: %d\n", ((ret_argn + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)));
-    //return ((ret_argn + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)) + argn_org;
-    //printf("return val: %d\n", (argn + (arg_offset + (sizeof(ffi_arg)-1)) / sizeof(ffi_arg)));
-    //return argn + (arg_offset + (sizeof(ffi_arg)-1))/sizeof(ffi_arg);
 }
-
-
-void print_bytes(const void *object, size_t size)
-{
-  // This is for C++; in C just drop the static_cast<>() and assign.
-  const unsigned char * const bytes = object;
-  size_t i;
-
-  printf("[ ");
-  for(i = 0; i < size; i++)
-  {
-    printf("%02x ", bytes[i]);
-  }
-  printf("]\n");
-}
-
 
 
 /*
@@ -1198,7 +1059,6 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     argn = 0;
     fargn = 0;
     
-    //printf("ar %x, fpr %x\n", ar[0], fpr[0]);
     if (cif->rstruct_flag)
     {
         rvalue = (void *)ar[0];
@@ -1213,20 +1073,10 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
     while (i < avn)
     {
         z = arg_types[i]->size;
-        //printf("i is %d, type is %d\n", i, arg_types[i]->type);
-        //printf("size is %d\n", z);
         //the argument is a float/doubel/ Handling depends wether its variadic, what is the number of argsm and is there a soft float
         if (arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE)
         {
-           //printf("fpr %x, fargn %x\n", fpr[0], fargn);
-           //argp = (fargn >= 8 || (cif->isvariadic && (i > cif->nfixedargs)) || soft_float) ? ar + argn : fpr + fargn;
-           fargp = (fargn >= 8 || (cif->isvariadic && (i > cif->nfixedargs)) || soft_float) ? argp : fpr + fargn;
-            //printf("argp = %x\n", fargp); 
-            //printf("ar is %x, argn is %d\n", ar, argn);
-            //printf("i is %d, type is , argp is %x, hex value is %x\n", i, argp, *argp);
-           //avaluep[i] = (char *) argp2;
-           //printf("argp %x\n", argp[0]);
-           //printf("argp %f\n", (char)*argp);
+           fargp = (fargn >= 8 || (cif->isvariadic && (i > cif->nfixedargs)) || (max_fp_reg_size==0)) ? argp : fpr + fargn;
            switch (arg_types[i]->type)
            {
                 case FFI_TYPE_FLOAT:
@@ -1239,25 +1089,16 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     avalue[i] = (char*) *fargp;
                     break;
            }
-           //printf("avaluep %x\n", avaluep[i]);
         }
         //long doubles are handled according to the integer convention
         else if (arg_types[i]->type == FFI_TYPE_LONGDOUBLE)
         {
-            //argp = ar + argn;
-            //printf("before align argp = %x\n", argp); 
-            //printf("ar is %x, argn is %d\n", ar, argn);
-            //printf("i is %d, type is , argp is %x, hex value is %x\n", i, argp, *argp);
             if ((uintptr_t)argp & (arg_types[i]->alignment-1))
             {
                 argp = (ffi_arg*)ALIGN(argp, arg_types[i]->alignment);
-                //argn++;
-                //argn = ALIGN(argn, arg_types[i]->alignment / sizeof(ffi_arg));
             }
-            //printf("after align argp = %x\n", argp); 
             avaluep[i] = alloca(arg_types[i]->size);
             memcpy(avaluep[i], argp, arg_types[i]->size);
-            //printf("avaluep %x\n", avaluep[i]);
         }
         //handle according to struct or integer convetions
         else
@@ -1276,14 +1117,6 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                 argp = ALIGN(argp, arg_types[i]->alignment / sizeof(ffi_arg));
             }
 
-            //argp = ar + argn;
-
-
-            //printf("argp = %x\n", argp); 
-            //printf("ar is %x, argn is %d\n", ar, argn);
-            //printf("i is %d, type is %d, argp is %x, hex value is %x\n", i, type, argp, *argp);
-            //if (soft_float && type == FFI_TYPE_FLOAT)
-            //    type = FFI_TYPE_UINT32;
             
             switch (type)
             {
@@ -1328,7 +1161,6 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     break;
                     
                 case FFI_TYPE_STRUCT:
-                    //printf("\ni is %d, type is %d\n", i, type);
                     if (argn < 8 && arg_types[i]->size <= 2*sizeof(ffi_arg))
                     {
                         /* Allocate space to copy structs that were passed in registers */
@@ -1351,11 +1183,9 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
                     
                 /* Else fall through. */
                 default:
-                    //printf("\ni is %d, type is %d\n", i, arg_types[i]->type);
                     avaluep[i] = (char *) argp;
                     break;
             }
-           //printf("avaluep %x\n", avaluep[i]);
         }
         if ((arg_types[i]->type == FFI_TYPE_FLOAT || arg_types[i]->type == FFI_TYPE_DOUBLE) && !(fargn >= 8 || (cif->isvariadic && (i>cif->nfixedargs) ) || soft_float))
         {
@@ -1370,20 +1200,10 @@ int ffi_closure_riscv_inner(ffi_closure *closure, void *rvalue, ffi_arg *ar, ffi
         {
            argn += ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
            argp += ALIGN(z, sizeof(ffi_arg)) / sizeof(ffi_arg);
-           //printf("z %d. size of ffi_arg %d, argn %d\n", z, sizeof(ffi_arg), argn);
         }
         i++;
     }
    
-    /*
-    for (int j =0; j<avn; j++)
-    {
-       printf("\navaluep[%d] = %x\n", j, avaluep[j]);
-       print_bytes(avaluep[j], 8);
-
-    }
-    */
- 
     /* Invoke the closure. */
     (closure->fun) (cif, rvalue, avaluep, closure->user_data);
     return cif->flags >> (FFI_FLAG_BITS * 8);
