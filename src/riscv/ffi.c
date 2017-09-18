@@ -286,7 +286,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
             if (freg<8 && (type == FFI_TYPE_FLOAT || type == FFI_TYPE_DOUBLE || num_struct_floats>0))
             {
               //if this is a floating point, we want to align the floating point "fake stack"
-              if ((a - 1) & (unsigned long) argp)
+              if ((a - 1) & (unsigned long) fargp)
               {
                   fargp = (char *) ALIGN(fargp, a);
               }
@@ -447,6 +447,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
         {
             /* Just some big struct, pass it by value by copying it onto
                the stack. */
+            argp = (char *) ALIGN(argp, a);
             memcpy(argp, *p_argv, z);
             argp += z;
         }
