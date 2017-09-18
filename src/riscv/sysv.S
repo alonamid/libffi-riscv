@@ -849,13 +849,46 @@ cls_retstruct_d_f:
     
 cls_retstruct_f_d:
     li      t0,  FFI_TYPE_STRUCT_FD
-    bne     a0,  t0, cls_retstruct_small2
+    bne     a0,  t0, cls_retstruct_f_i
     li      t5, 0xffffffffffffffff # initialize register to NaN
     fcvt.d.l fa0, t5 # initialize register to Nan
     flw     fa0, V0_OFF2(sp)
     fld     fa1, V1_OFF2(sp)
     j       cls_epilogue
-    
+
+
+cls_retstruct_f_i:
+    li      t0,  FFI_TYPE_STRUCT_FI
+    bne     a0,  t0, cls_retstruct_d_i
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
+    flw     fa0, V0_OFF2(sp)
+    lw      a0, V1_OFF2(sp)
+    j       cls_epilogue
+
+cls_retstruct_d_i:
+    li      t0,  FFI_TYPE_STRUCT_DI
+    bne     a0,  t0, cls_retstruct_i_f
+    fld     fa0, V0_OFF2(sp)
+    lw      a0, V1_OFF2(sp)
+    j       cls_epilogue
+
+cls_retstruct_i_f:
+    li      t0,  FFI_TYPE_STRUCT_IF
+    bne     a0,  t0, cls_retstruct_i_d
+    lw      a0, V0_OFF2(sp)
+    li      t5, 0xffffffffffffffff # initialize register to NaN
+    fcvt.d.l fa0, t5 # initialize register to Nan
+    flw     fa0, V1_OFF2(sp)
+    j       cls_epilogue
+
+cls_retstruct_i_d:
+    li      t0,  FFI_TYPE_STRUCT_ID
+    bne     a0,  t0, cls_retstruct_small2
+    lw      a0, V0_OFF2(sp)
+    fld     fa0, V1_OFF2(sp)
+    j       cls_epilogue
+
 cls_retstruct_small2:
     REG_L   a0, V0_OFF2(sp)
     REG_L   a1, V1_OFF2(sp)
