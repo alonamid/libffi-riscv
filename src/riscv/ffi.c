@@ -390,6 +390,11 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
             }
             else //handle like the integer convention
             {
+               if (isvariadic && i>=nfixedargs && xreg<8 && a==2*FFI_SIZEOF_ARG && (xreg%2)==1)
+               {
+                  xreg += 1;
+                  argp += FFI_SIZEOF_ARG; 
+               }
                 /* Check if the data will fit within the register space.
                    Handle it if it doesn't. */
                 unsigned long end = (unsigned long) argp + z;
