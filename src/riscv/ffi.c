@@ -283,7 +283,7 @@ static void ffi_prep_args(char *stack, extended_cif *ecif, int bytes, int flags)
             }
 
 
-            if (freg<8 && (type == FFI_TYPE_FLOAT || type == FFI_TYPE_DOUBLE || num_struct_floats>0))
+            if (freg<8 && (type == FFI_TYPE_FLOAT || type == FFI_TYPE_DOUBLE || num_struct_floats>0) && !(isvariadic && i>=nfixedargs))
             {
               //if this is a floating point, we want to align the floating point "fake stack"
               if ((a - 1) & (unsigned long) fargp)
