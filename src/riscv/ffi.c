@@ -900,10 +900,9 @@ ffi_status ffi_prep_closure_loc(ffi_closure *closure, ffi_cif *cif, void (*fun)(
     FFI_ASSERT(tramp == codeloc);
     
     /* Remove when more than just rv64 is supported */
-    if (cif->abi != FFI_RV64_SINGLE || cif->abi != FFI_RV64_DOUBLE)
+    if (!(cif->abi == FFI_RV64_SINGLE || cif->abi == FFI_RV64_DOUBLE))
     {
-        //printf("bad abi?");
-       // return FFI_BAD_ABI;
+       return FFI_BAD_ABI;
     }
 
     if (cif->abi == FFI_RV32_SINGLE || cif->abi == FFI_RV32_DOUBLE || cif->abi == FFI_RV32_SOFT_FLOAT || fn < 0x7ffff000U)
