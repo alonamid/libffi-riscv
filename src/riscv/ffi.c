@@ -1,6 +1,7 @@
 /* -----------------------------------------------------------------------
    ffi.c - Copyright (c) 2015 Michael Knyszek <mknyszek@berkeley.edu>
                          2015 Andrew Waterman <waterman@cs.berkeley.edu>
+                         2017 Alon Amid <alonamid@eecs.berkeley.edu>
    Based on MIPS N32/64 port
    
    RISC-V Foreign Function Interface 

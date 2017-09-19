@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------*-C-*-
    ffitarget.h - 2014 Michael Knyszek
-   
+                 2017 Alon Amid 
    Target configuration macros for RISC-V.
 
    Permission is hereby granted, free of charge, to any person obtaining
