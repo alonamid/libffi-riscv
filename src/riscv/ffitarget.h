@@ -77,7 +77,7 @@ typedef enum ffi_abi {
    #elif __riscv_float_abi_single
     FFI_DEFAULT_ABI = FFI_RV32_SINGLE
    #else
-    FFI_DEFAULT_ABI - FFI_RV32_DOUBLE
+    FFI_DEFAULT_ABI = FFI_RV32_DOUBLE
 //  #else
 //    FFI_DEFAULT_ABI = FFI_RV32
   #endif
